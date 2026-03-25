@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum ClubStatus {
+  OPEN
+  FULL
+  CLOSED
+}
+
+enum ClubCategory {
+  SPORTS
+  ACADEMIC
+  CULTURAL
+  RELIGIOUS
+  OTHER
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WAITLISTED
+}
+
+enum MaterialType {
+  PDF
+  SLIDES
+  NOTES
+}
+
+enum ResourceType {
+  ARTICLE
+  YOUTUBE
+  LINK
+}
+
+enum AchievementType {
+  TROPHY
+  CERTIFICATE
+  MEDAL
+}
+
+enum SessionStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum ContactPreference {
+  EMAIL
+  CHAT
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id          Int      @id @default(autoincrement())
+  fullName    String
+  email       String   @unique
+  studentId   String   @unique
+  password    String
+  faculty     String
+  degree      String
+  intakeYear  Int
+  role        Role     @default(STUDENT)
+  photoUrl    String?
+  phone       String?
+  dateOfBirth DateTime?
+  gender      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  semesters        Semester[]
+  sportAchievements SportAchievement[]
+  studentClubs     StudentClub[]
+  materials        StudyMaterial[]
+  bookmarks        Bookmark[]
+  clubApplications ClubApplication[]
+  mentorProfile    MentorProfile?
+  sessionApplications SessionApplication[]
+  sessionFeedbacks SessionFeedback[]
+  notifications    Notification[]
+  sentMessages     Message[]         @relation("SentMessages")
+  receivedMessages Message[]         @relation("ReceivedMessages")
+  fileAssets       FileAsset[]
+}
+
+// ─── Academic ─────────────────────────────────────────────────────────────────
+
+model Semester {
+  id           Int      @id @default(autoincrement())
+  semesterNum  Int
+  academicYear String
+  gpa          Float?
+  userId       Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects SubjectResult[]
+}
+
+model SubjectResult {
+  id          Int      @id @default(autoincrement())
+  subjectCode String
+  subjectName String
+  credits     Int
+  marks       Float
+  grade       String
+  semesterId  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  semester Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+}
+
+// ─── Sports ───────────────────────────────────────────────────────────────────
+
+model SportAchievement {
+  id              Int             @id @default(autoincrement())
+  sportName       String
+  achievementType AchievementType
+  position        String?
+  date            DateTime
+  points          Int             @default(0)
+  userId          Int
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileAsset FileAsset?
+}
+
+// ─── Clubs ────────────────────────────────────────────────────────────────────
+
+model Club {
+  id           Int          @id @default(autoincrement())
+  name         String
+  category     ClubCategory
+  description  String       @db.Text
+  requirements String?      @db.Text
+  capacity     Int
+  status       ClubStatus   @default(OPEN)
+  logoUrl      String?
+  email        String?
+  social       String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  members      StudentClub[]
+  applications ClubApplication[]
+}
+
+model StudentClub {
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  clubId             Int
+  role               String   @default("Member")
+  joinedDate         DateTime @default(now())
+  participationPoints Int     @default(0)
+  isActive           Boolean  @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clubId])
+}
+
+model ClubApplication {
+  id              Int               @id @default(autoincrement())
+  userId          Int
+  clubId          Int
+  currentYear     Int?
+  currentSemester Int?
+  gpa             Float?
+  motivation      String            @db.Text
+  contribution    String?           @db.Text
+  experience      String?           @db.Text
+  availableDays   String?
+  additionalInfo  String?           @db.Text
+  status          ApplicationStatus @default(PENDING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  club     Club                  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  feedback ApplicationFeedback?
+}
+
+model ApplicationFeedback {
+  id            Int      @id @default(autoincrement())
+  applicationId Int      @unique
+  message       String   @db.Text
+  createdAt     DateTime @default(now())
+
+  application ClubApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+// ─── Study Materials ──────────────────────────────────────────────────────────
+
+model StudyMaterial {
+  id          Int          @id @default(autoincrement())
+  title       String
+  courseCode  String
+  type        MaterialType
+  description String?      @db.Text
+  userId      Int
+  isSummarized Boolean     @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileAsset          FileAsset?
+  summary            MaterialSummary?
+  suggestedResources SuggestedResource[]
+}
+
+model MaterialSummary {
+  id           Int      @id @default(autoincrement())
+  materialId   Int      @unique
+  quickSummary String   @db.Text
+  detailedNotes String? @db.Text
+  keyTerms     String?  @db.Text
+  qaContent    String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  material StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+}
+
+model SuggestedResource {
+  id         Int          @id @default(autoincrement())
+  materialId Int
+  title      String
+  sourceName String
+  url        String
+  type       ResourceType
+  createdAt  DateTime     @default(now())
+
+  material  StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  bookmarks Bookmark[]
+}
+
+model Bookmark {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  resourceId Int
+  createdAt  DateTime @default(now())
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource SuggestedResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resourceId])
+}
+
+// ─── Support / Mentors ────────────────────────────────────────────────────────
+
+model MentorProfile {
+  id                Int               @id @default(autoincrement())
+  userId            Int               @unique
+  gpa               Float
+  subjects          String            @db.Text
+  bio               String            @db.Text
+  preferredDays     String?
+  contactPreference ContactPreference @default(EMAIL)
+  isActive          Boolean           @default(false)
+  sessionsCount     Int               @default(0)
+  rating            Float             @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions SupportSession[]
+}
+
+model SupportSession {
+  id           Int           @id @default(autoincrement())
+  mentorId     Int
+  subject      String
+  description  String?       @db.Text
+  date         DateTime
+  durationMins Int           @default(60)
+  locationOrLink String?
+  capacity     Int           @default(10)
+  status       SessionStatus @default(UPCOMING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  mentor       MentorProfile        @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  applications SessionApplication[]
+  feedbacks    SessionFeedback[]
+}
+
+model SessionApplication {
+  id        Int               @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  status    ApplicationStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  session SupportSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+}
+
+model SessionFeedback {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  session SupportSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+}
+
+// ─── Notifications & Chat ─────────────────────────────────────────────────────
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  content    String   @db.Text
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+// ─── File Assets ──────────────────────────────────────────────────────────────
+
+model FileAsset {
+  id                Int               @id @default(autoincrement())
+  fileName          String
+  fileSize          Int
+  fileUrl           String
+  fileType          String
+  userId            Int
+  materialId        Int?              @unique
+  achievementId     Int?              @unique
+  createdAt         DateTime          @default(now())
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material    StudyMaterial?    @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  achievement SportAchievement? @relation(fields: [achievementId], references: [id], onDelete: SetNull)
+}
