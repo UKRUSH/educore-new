@@ -10,7 +10,8 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     include: {
       fileAsset: { select: { fileName: true, fileSize: true, fileUrl: true, fileType: true } },
-      summary: { select: { quickSummary: true } },
+      summary: true,
+      suggestedResources: { orderBy: { createdAt: "asc" } },
     },
   })
 
