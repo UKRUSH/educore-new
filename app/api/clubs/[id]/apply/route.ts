@@ -35,7 +35,7 @@ export async function POST(
     return Response.json({ error: "You have already applied to this club." }, { status: 409 })
 
   const body = await request.json()
-  const { motivation, currentYear, currentSemester, gpa, contribution, experience, availableDays } = body
+  const { motivation, currentYear, currentSemester, gpa, contribution, experience, availableDays, additionalInfo } = body
 
   if (!motivation?.trim())
     return Response.json({ error: "Motivation is required." }, { status: 400 })
@@ -51,6 +51,7 @@ export async function POST(
       contribution: contribution ? String(contribution).trim() : null,
       experience: experience ? String(experience).trim() : null,
       availableDays: availableDays ? String(availableDays).trim() : null,
+      additionalInfo: additionalInfo ? String(additionalInfo).trim() : null,
     },
     include: { club: { select: { name: true } } },
   })
