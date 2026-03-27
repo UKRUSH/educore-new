@@ -40,6 +40,7 @@ export default function Topbar({
 
   const pageMeta =
     PAGE_META[pathname] ??
+    (/^\/admin\/users\/\d+\/academic/.test(pathname) ? { title: "Academic History", icon: "🎓", desc: "Student semester records" } : null) ??
     Object.entries(PAGE_META).find(([k]) => pathname.startsWith(k + "/"))?.[1] ??
     { title: "", icon: "⊞", desc: "" }
 
