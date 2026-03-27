@@ -18,6 +18,7 @@ const PAGE_META: Record<string, { title: string; icon: string; desc: string }> =
   "/admin/club-applications":{ title: "Applications",     icon: "◎",  desc: "Review pending club applications" },
   "/admin/mentors":          { title: "Mentors",          icon: "◎",  desc: "Manage mentor profiles" },
   "/admin/dean-list":        { title: "Dean List",        icon: "★",  desc: "High-achieving students" },
+  "/mentor":                 { title: "Mentor Profile",   icon: "🎓", desc: "Your dean's list mentor profile" },
   "/lecturer":               { title: "Lecturer Dashboard", icon: "⊞", desc: "Your teaching overview" },
   "/lecturer/analytics":     { title: "Analytics",        icon: "◫",  desc: "Performance & engagement data" },
 }

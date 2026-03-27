@@ -167,14 +167,28 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; bord
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function Sidebar({
-  role, name, photoUrl,
+  role, name, photoUrl, isDeanList = false,
 }: {
   role: string
   name: string
   photoUrl: string | null
+  isDeanList?: boolean
 }) {
   const pathname = usePathname()
-  const sections = NAV[role] ?? NAV.STUDENT
+  const baseSections = NAV[role] ?? NAV.STUDENT
+  const sections = (role === "STUDENT" && isDeanList)
+    ? baseSections.map(s =>
+        s.section === "Academic"
+          ? {
+              ...s,
+              items: [
+                ...s.items,
+                { label: "My Mentor Profile", href: "/mentor", icon: ICONS.mentors } as NavItem,
+              ],
+            }
+          : s
+      )
+    : baseSections
   const meta     = ROLE_META[role] ?? ROLE_META.STUDENT
   const initials = name.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()
 
