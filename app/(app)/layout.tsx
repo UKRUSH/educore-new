@@ -21,7 +21,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <Sidebar role={user.role} />
+      <Sidebar role={user.role} name={user.fullName} photoUrl={user.photoUrl} />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar name={user.fullName} photoUrl={user.photoUrl} />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
