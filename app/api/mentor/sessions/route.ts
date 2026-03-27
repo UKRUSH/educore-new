@@ -19,6 +19,21 @@ export async function GET() {
     orderBy: { date: "desc" },
     include: {
       _count: { select: { applications: true } },
+      applications: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              studentId: true,
+              faculty: true,
+              degree: true,
+              photoUrl: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      },
     },
   })
 
@@ -33,6 +48,15 @@ export async function GET() {
     status: s.status,
     enrolled: s._count.applications,
     createdAt: s.createdAt,
+    students: s.applications.map(a => ({
+      id: a.user.id,
+      fullName: a.user.fullName,
+      studentId: a.user.studentId,
+      faculty: a.user.faculty,
+      degree: a.user.degree,
+      photoUrl: a.user.photoUrl,
+      joinedAt: a.createdAt,
+    })),
   })))
 }
 

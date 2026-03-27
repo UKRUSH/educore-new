@@ -24,6 +24,16 @@ type UserInfo = {
   photoUrl: string | null
 }
 
+type EnrolledStudent = {
+  id: number
+  fullName: string
+  studentId: string
+  faculty: string
+  degree: string
+  photoUrl: string | null
+  joinedAt: string
+}
+
 type SupportSession = {
   id: number
   subject: string
@@ -34,6 +44,7 @@ type SupportSession = {
   capacity: number
   status: "UPCOMING" | "ONGOING" | "COMPLETED" | "CANCELLED"
   enrolled: number
+  students: EnrolledStudent[]
 }
 
 const CSS = `
@@ -276,6 +287,11 @@ const CSS = `
   color: oklch(0.45 0.22 27);
 }
 .mp-btn-sm-red:hover { background: oklch(0.90 0.06 27 / .8); }
+.mp-btn-sm-delete {
+  background: oklch(0.40 0.22 27); border: 1px solid oklch(0.35 0.22 27);
+  color: #fff;
+}
+.mp-btn-sm-delete:hover { background: oklch(0.35 0.24 27); }
 
 /* ============  SESSIONS  ============ */
 .mp-sess-header {
@@ -346,6 +362,57 @@ const CSS = `
 .mp-modal-close:hover { background: var(--border); }
 .mp-modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
 .mp-modal-foot { padding: 0 1.5rem 1.5rem; display: flex; gap: .75rem; }
+
+/* ====  Enrolled students panel  ==== */
+.mp-students-toggle {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .42rem .85rem; border-radius: .65rem; cursor: pointer;
+  background: var(--muted); border: 1.5px solid var(--border);
+  color: var(--foreground); font-size: .75rem; font-weight: 700;
+  transition: all .15s; flex-shrink: 0;
+}
+.mp-students-toggle:hover { border-color: oklch(0.6231 0.1880 259.8145); background: oklch(0.6231 0.1880 259.8145 / .07); }
+.mp-students-toggle.open { border-color: oklch(0.6231 0.1880 259.8145); background: oklch(0.6231 0.1880 259.8145 / .1); color: oklch(0.4882 0.2172 264.3763); }
+.mp-enroll-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: oklch(0.6231 0.1880 259.8145); color: #fff; font-size: .6rem; font-weight: 800;
+}
+.mp-students-panel {
+  border-top: 1px solid var(--border);
+  background: oklch(0.6231 0.1880 259.8145 / .03);
+}
+.mp-students-head {
+  padding: .65rem 1.75rem; display: flex; align-items: center; gap: .5rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .78rem; font-weight: 800; color: var(--foreground);
+}
+.mp-students-list { padding: .65rem 1.75rem; display: flex; flex-direction: column; gap: .55rem; }
+.mp-student-row {
+  display: flex; align-items: center; gap: .85rem;
+  padding: .65rem .85rem; border-radius: .75rem;
+  background: var(--card); border: 1px solid var(--border);
+}
+.mp-student-av {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, oklch(0.4882 0.2172 264.3763), oklch(0.6231 0.1880 259.8145));
+  display: flex; align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 900; color: #fff; overflow: hidden;
+}
+.mp-student-av img { width: 100%; height: 100%; object-fit: cover; }
+.mp-student-info { flex: 1; min-width: 0; }
+.mp-student-name { font-size: .82rem; font-weight: 700; color: var(--foreground); }
+.mp-student-meta { font-size: .7rem; color: var(--muted-foreground); margin-top: .08rem; }
+.mp-student-sid {
+  display: inline-flex; align-items: center;
+  padding: .18rem .55rem; border-radius: 999px;
+  background: var(--muted); border: 1px solid var(--border);
+  font-size: .68rem; font-weight: 700; color: var(--muted-foreground);
+}
+.mp-no-students {
+  padding: 1rem; text-align: center; font-size: .8rem; color: var(--muted-foreground);
+  border: 1.5px dashed var(--border); border-radius: .75rem;
+}
 
 /* Skeleton */
 .mp-skel { background: var(--muted); border-radius: .75rem; animation: mpShimmer 1.5s ease-in-out infinite; }
@@ -426,6 +493,7 @@ export default function MentorProfilePage() {
   const [sessErr, setSessErr]           = useState("")
   const [sessFieldErr, setSessFieldErr] = useState<Record<string, string>>({})
   const [sessSaving, setSessSaving]     = useState(false)
+  const [expandedSession, setExpandedSession] = useState<number | null>(null)
 
   const selectedDays = form.preferredDays
     ? form.preferredDays.split(",").map(d => d.trim()).filter(Boolean)
@@ -547,6 +615,13 @@ export default function MentorProfilePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "CANCELLED" }),
     })
+    await loadSessions()
+  }
+
+  async function deleteSession(id: number) {
+    if (!confirm("Permanently delete this session? This cannot be undone.")) return
+    await fetch(`/api/mentor/sessions/${id}`, { method: "DELETE" })
+    setExpandedSession(prev => prev === id ? null : prev)
     await loadSessions()
   }
 
@@ -697,37 +772,86 @@ export default function MentorProfilePage() {
                       const d = fmtDate(s.date)
                       const isPast = new Date(s.date) < new Date()
                       return (
-                        <div className="mp-sess-item" key={s.id}>
-                          <div className="mp-sess-date-box">
-                            <span className="mp-sess-month">{d.month}</span>
-                            <span className="mp-sess-day">{d.day}</span>
-                            <span className="mp-sess-year">{d.year}</span>
-                          </div>
-                          <div className="mp-sess-body">
-                            <div className="mp-sess-subj">{s.subject}</div>
-                            {s.description && <div className="mp-sess-desc">{s.description}</div>}
-                            <div className="mp-sess-meta">
-                              <span className="mp-sess-tag">🕐 {d.time}</span>
-                              <span className="mp-sess-tag">⏱ {s.durationMins} min</span>
-                              <span className="mp-sess-tag">👥 {s.enrolled}/{s.capacity} enrolled</span>
-                              {s.locationOrLink && <span className="mp-sess-tag">🔗 Session Link</span>}
-                              <span className={`mp-status-pill ${STATUS_PILL[s.status]}`}>
-                                {STATUS_DOT[s.status]} {s.status}
-                              </span>
+                        <div key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                          {/* Main row */}
+                          <div className="mp-sess-item" style={{ borderBottom: "none" }}>
+                            <div className="mp-sess-date-box">
+                              <span className="mp-sess-month">{d.month}</span>
+                              <span className="mp-sess-day">{d.day}</span>
+                              <span className="mp-sess-year">{d.year}</span>
+                            </div>
+                            <div className="mp-sess-body">
+                              <div className="mp-sess-subj">{s.subject}</div>
+                              {s.description && <div className="mp-sess-desc">{s.description}</div>}
+                              <div className="mp-sess-meta">
+                                <span className="mp-sess-tag">🕐 {d.time}</span>
+                                <span className="mp-sess-tag">⏱ {s.durationMins} min</span>
+                                {s.locationOrLink && <span className="mp-sess-tag">🔗 Session Link</span>}
+                                <span className={`mp-status-pill ${STATUS_PILL[s.status]}`}>
+                                  {STATUS_DOT[s.status]} {s.status}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mp-sess-actions">
+                              {/* Students toggle */}
+                              <button
+                                className={`mp-students-toggle${expandedSession === s.id ? " open" : ""}`}
+                                onClick={() => setExpandedSession(expandedSession === s.id ? null : s.id)}
+                              >
+                                👥
+                                <span className="mp-enroll-count">{s.enrolled}</span>
+                                / {s.capacity}
+                                <span style={{ marginLeft: ".2rem" }}>{expandedSession === s.id ? "▲" : "▼"}</span>
+                              </button>
+                              {s.status === "UPCOMING" && !isPast && (
+                                <>
+                                  <button className="mp-btn-sm mp-btn-sm-muted" onClick={() => openEditModal(s)}>
+                                    ✏️ Edit
+                                  </button>
+                                  <button className="mp-btn-sm mp-btn-sm-red" onClick={() => cancelSession(s.id)}>
+                                    Cancel
+                                  </button>
+                                </>
+                              )}
+                              <button className="mp-btn-sm mp-btn-sm-delete" onClick={() => deleteSession(s.id)}>
+                                🗑 Delete
+                              </button>
                             </div>
                           </div>
-                          <div className="mp-sess-actions">
-                            {s.status === "UPCOMING" && !isPast && (
-                              <>
-                                <button className="mp-btn-sm mp-btn-sm-muted" onClick={() => openEditModal(s)}>
-                                  ✏️ Edit
-                                </button>
-                                <button className="mp-btn-sm mp-btn-sm-red" onClick={() => cancelSession(s.id)}>
-                                  Cancel
-                                </button>
-                              </>
-                            )}
-                          </div>
+
+                          {/* Enrolled students panel */}
+                          {expandedSession === s.id && (
+                            <div className="mp-students-panel">
+                              <div className="mp-students-head">
+                                👥 Enrolled Students
+                                <span style={{ color: "var(--muted-foreground)", fontWeight: 500 }}>
+                                  ({s.enrolled} / {s.capacity} seats filled)
+                                </span>
+                              </div>
+                              <div className="mp-students-list">
+                                {s.students.length === 0 ? (
+                                  <div className="mp-no-students">No students have joined this session yet.</div>
+                                ) : (
+                                  s.students.map(st => (
+                                    <div className="mp-student-row" key={st.id}>
+                                      <div className="mp-student-av">
+                                        {st.photoUrl
+                                          // eslint-disable-next-line @next/next/no-img-element
+                                          ? <img src={st.photoUrl} alt={st.fullName} />
+                                          : st.fullName.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()
+                                        }
+                                      </div>
+                                      <div className="mp-student-info">
+                                        <div className="mp-student-name">{st.fullName}</div>
+                                        <div className="mp-student-meta">{st.degree} · {st.faculty}</div>
+                                      </div>
+                                      <span className="mp-student-sid">{st.studentId}</span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
