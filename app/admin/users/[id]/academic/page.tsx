@@ -288,7 +288,25 @@ export default function AcademicPage() {
   }
 
   async function saveSem() {
-    if (!semForm.semesterNum || !semForm.academicYear) { setSemErr("All fields are required."); return }
+    const currentYear = new Date().getFullYear()
+    if (!semForm.semesterNum || !semForm.academicYear.trim()) {
+      setSemErr("All fields are required."); return
+    }
+    const semNum = Number(semForm.semesterNum)
+    if (semNum !== 1 && semNum !== 2) {
+      setSemErr("Semester number must be 1 or 2."); return
+    }
+    const yr = semForm.academicYear.trim()
+    if (!/^\d{4}$/.test(yr)) {
+      setSemErr("Academic year must be exactly 4 digits (e.g. 2024)."); return
+    }
+    const yrNum = Number(yr)
+    if (yrNum < 2000) {
+      setSemErr("Academic year must be 2000 or later."); return
+    }
+    if (yrNum > currentYear) {
+      setSemErr(`Academic year cannot be in the future (max ${currentYear}).`); return
+    }
     setSemSaving(true); setSemErr("")
     try {
       const url = semModal === "add" ? "/api/admin/semesters" : `/api/admin/semesters/${semEditId}`
@@ -341,15 +359,18 @@ export default function AcademicPage() {
   async function saveSubj() {
     const errs: Record<string, string> = {}
 
-    if (!subjForm.subjectCode.trim())
+    const rawCode = subjForm.subjectCode.trim().toUpperCase()
+    if (!rawCode)
       errs.subjectCode = "Subject code is required."
+    else if (!/^[A-Z]{2}\d{4}$/.test(rawCode))
+      errs.subjectCode = "Format: 2 letters + 4 digits (e.g. IT1010)."
 
     if (!subjForm.subjectName.trim())
       errs.subjectName = "Subject name is required."
 
     const credits = Number(subjForm.credits)
-    if (!subjForm.credits || isNaN(credits) || credits < 1 || credits > 6)
-      errs.credits = "Credits must be 1 – 6."
+    if (!subjForm.credits || isNaN(credits) || credits < 1 || credits > 4)
+      errs.credits = "Credits must be 1 – 4."
 
     const ca  = subjForm.caMarks    !== "" ? Number(subjForm.caMarks)    : null
     const fin = subjForm.finalMarks !== "" ? Number(subjForm.finalMarks) : null
@@ -367,11 +388,10 @@ export default function AcademicPage() {
       errs.marks = "Overall marks must be 0 – 100."
 
     // Duplicate subject code check within the same semester
-    if (!errs.subjectCode && subjForm.subjectCode.trim()) {
+    if (!errs.subjectCode && rawCode) {
       const sem = student?.semesters.find(s => s.id === subjSemId)
-      const code = subjForm.subjectCode.trim().toUpperCase()
       const duplicate = sem?.subjects.find(
-        s => s.subjectCode.toUpperCase() === code && s.id !== subjEditId
+        s => s.subjectCode.toUpperCase() === rawCode && s.id !== subjEditId
       )
       if (duplicate)
         errs.subjectCode = `"${duplicate.subjectCode}" already exists in this semester.`
@@ -416,13 +436,19 @@ export default function AcademicPage() {
     setSubjForm(prev => {
       const next = { ...prev, [field]: value }
 
-      // Live duplicate code check
-      if (field === "subjectCode" && value.trim()) {
-        const sem = student?.semesters.find(s => s.id === subjSemId)
+      // Live subject code validation
+      if (field === "subjectCode") {
         const code = value.trim().toUpperCase()
-        const dup = sem?.subjects.find(s => s.subjectCode.toUpperCase() === code && s.id !== subjEditId)
-        if (dup) {
-          setSubjFieldErrors(prev => ({ ...prev, subjectCode: `"${dup.subjectCode}" already exists in this semester.` }))
+        if (code && !/^[A-Z]{0,2}\d{0,4}$/.test(code)) {
+          setSubjFieldErrors(prev => ({ ...prev, subjectCode: "Format: 2 letters + 4 digits (e.g. IT1010)." }))
+        } else if (code.length === 6 && !/^[A-Z]{2}\d{4}$/.test(code)) {
+          setSubjFieldErrors(prev => ({ ...prev, subjectCode: "Format: 2 letters + 4 digits (e.g. IT1010)." }))
+        } else if (code) {
+          // Duplicate check
+          const sem = student?.semesters.find(s => s.id === subjSemId)
+          const dup = sem?.subjects.find(s => s.subjectCode.toUpperCase() === code && s.id !== subjEditId)
+          if (dup)
+            setSubjFieldErrors(prev => ({ ...prev, subjectCode: `"${dup.subjectCode}" already exists in this semester.` }))
         }
       }
 
@@ -658,13 +684,28 @@ export default function AcademicPage() {
                 <div className="ah-modal-row2">
                   <div className="ah-field">
                     <label>Semester Number *</label>
-                    <input className="ah-input" type="number" min={1} max={12} value={semForm.semesterNum}
-                      onChange={e => setSemForm(f => ({ ...f, semesterNum: e.target.value }))} placeholder="e.g. 1" />
+                    <select className="ah-input" value={semForm.semesterNum}
+                      onChange={e => setSemForm(f => ({ ...f, semesterNum: e.target.value }))}>
+                      <option value="">Select…</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                    </select>
                   </div>
                   <div className="ah-field">
-                    <label>Academic Year *</label>
-                    <input className="ah-input" type="text" value={semForm.academicYear}
-                      onChange={e => setSemForm(f => ({ ...f, academicYear: e.target.value }))} placeholder="e.g. 2023/2024" />
+                    <label>Academic Year * <span style={{ fontSize: ".65rem", color: "var(--muted-foreground)", fontWeight: 400 }}>(e.g. 2024)</span></label>
+                    <input
+                      className="ah-input"
+                      type="number"
+                      min={2000}
+                      max={new Date().getFullYear()}
+                      value={semForm.academicYear}
+                      onChange={e => {
+                        // only allow up to 4 digits
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 4)
+                        setSemForm(f => ({ ...f, academicYear: val }))
+                      }}
+                      placeholder={String(new Date().getFullYear())}
+                    />
                   </div>
                 </div>
               </div>
@@ -702,11 +743,18 @@ export default function AcademicPage() {
                   {/* Row 1: Code + Credits */}
                   <div className="ah-modal-row2">
                     <div className="ah-field">
-                      <label>Subject Code *</label>
+                      <label>Subject Code * <span style={{ fontSize: ".63rem", color: "var(--muted-foreground)", fontWeight: 400 }}>2 letters + 4 digits</span></label>
                       <input className={`ah-input${subjFieldErrors.subjectCode ? " err" : ""}`}
                         type="text" value={subjForm.subjectCode}
-                        onChange={e => handleSubjFormChange("subjectCode", e.target.value)}
-                        placeholder="e.g. CS101" />
+                        maxLength={6}
+                        onChange={e => {
+                          const raw = e.target.value.toUpperCase()
+                          // Allow: up to 2 letters, then up to 4 digits only
+                          const letters = raw.slice(0, 2).replace(/[^A-Z]/g, "")
+                          const digits  = raw.slice(2).replace(/\D/g, "").slice(0, 4)
+                          handleSubjFormChange("subjectCode", letters + digits)
+                        }}
+                        placeholder="e.g. IT1010" />
                       {subjFieldErrors.subjectCode && (
                         <div className="ah-field-err">
                           <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
@@ -715,9 +763,9 @@ export default function AcademicPage() {
                       )}
                     </div>
                     <div className="ah-field">
-                      <label>Credits (1–6) *</label>
+                      <label>Credits (1–4) *</label>
                       <input className={`ah-input${subjFieldErrors.credits ? " err" : ""}`}
-                        type="number" min={1} max={6} value={subjForm.credits}
+                        type="number" min={1} max={4} value={subjForm.credits}
                         onChange={e => handleSubjFormChange("credits", e.target.value)}
                         placeholder="3" />
                       {subjFieldErrors.credits && (
