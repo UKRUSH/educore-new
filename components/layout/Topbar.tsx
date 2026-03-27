@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import { useState } from "react"
+import { useUserPhoto } from "@/contexts/UserPhotoContext"
 
 const PAGE_META: Record<string, { title: string; icon: string; desc: string }> = {
   "/dashboard":              { title: "Dashboard",        icon: "⊞",  desc: "Your learning overview" },
@@ -21,13 +22,17 @@ const PAGE_META: Record<string, { title: string; icon: string; desc: string }> =
 
 export default function Topbar({
   name,
-  photoUrl,
+  photoUrl: propPhotoUrl,
 }: {
   name: string
   photoUrl: string | null
 }) {
   const pathname = usePathname()
   const [notifOpen, setNotifOpen] = useState(false)
+  const { photoUrl: contextPhotoUrl } = useUserPhoto()
+
+  // Context wins (updated client-side after upload); fall back to server prop
+  const photoUrl = contextPhotoUrl ?? propPhotoUrl
 
   const initials = name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
   const firstName = name.split(" ")[0]

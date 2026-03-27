@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -12,31 +14,262 @@ const TABS = [
   { label: "Progress",  href: "/profile/progress" },
 ]
 
-const INPUT =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-
 const ACHIEVEMENT_TYPES = ["TROPHY", "MEDAL", "CERTIFICATE"] as const
 const TYPE_ICON: Record<string, string> = { TROPHY: "🏆", MEDAL: "🥇", CERTIFICATE: "📜" }
-const TYPE_COLOR: Record<string, string> = {
-  TROPHY:      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  MEDAL:       "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-  CERTIFICATE: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+const TYPE_STYLE: Record<string, { bg: string; fg: string }> = {
+  TROPHY:      { bg: "oklch(0.97 0.08 80)",  fg: "oklch(0.48 0.2 80)"  },
+  MEDAL:       { bg: "oklch(0.96 0.02 250)", fg: "oklch(0.42 0.06 250)" },
+  CERTIFICATE: { bg: "oklch(0.94 0.05 240)", fg: "oklch(0.42 0.18 240)" },
 }
 
 type Achievement = {
-  id: number
-  sportName: string
-  achievementType: string
-  position: string | null
-  date: string
-  points: number
+  id: number; sportName: string; achievementType: string
+  position: string | null; date: string; points: number
   fileAsset?: { fileUrl: string } | null
 }
 
-const EMPTY_FORM = {
-  sportName: "", achievementType: "TROPHY", position: "",
-  date: "", points: "10", eventName: "",
+const EMPTY_FORM = { sportName: "", achievementType: "TROPHY", position: "", date: "", points: "10", eventName: "" }
+
+const CSS = `
+.sp-wrap { max-width: 900px; margin: 0 auto; }
+
+.sp-hero {
+  background: linear-gradient(135deg, oklch(0.24 0.1 145) 0%, oklch(0.2 0.12 155) 100%);
+  border-radius: 1rem; padding: 1.5rem 1.75rem;
+  position: relative; overflow: hidden; margin-bottom: 1.5rem;
 }
+.sp-hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
+}
+.sp-hero-title { color: #fff; font-size: 1.35rem; font-weight: 700; margin: 0 0 .25rem; }
+.sp-hero-sub { color: oklch(0.8 0.05 145); font-size: .875rem; margin: 0; }
+.sp-hero-add {
+  position: absolute; right: 1.5rem; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; gap: .45rem;
+  background: rgba(255,255,255,0.12); color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: .55rem 1.1rem; border-radius: .65rem;
+  font-size: .8rem; font-weight: 600; cursor: pointer;
+  backdrop-filter: blur(8px); transition: background .2s;
+}
+.sp-hero-add:hover { background: rgba(255,255,255,0.22); }
+
+.sp-tabs {
+  display: flex; gap: .35rem; margin-bottom: 1.5rem;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: .75rem; padding: .35rem; overflow-x: auto;
+}
+.sp-tab {
+  flex-shrink: 0; padding: .45rem 1rem; border-radius: .5rem;
+  font-size: .8rem; font-weight: 500; color: var(--muted-foreground);
+  text-decoration: none; transition: all .2s; white-space: nowrap;
+}
+.sp-tab:hover { color: var(--foreground); background: var(--accent); }
+.sp-tab.active {
+  background: linear-gradient(135deg, oklch(0.45 0.2 145), oklch(0.38 0.22 155));
+  color: #fff; font-weight: 600;
+  box-shadow: 0 2px 8px oklch(0.45 0.2 145 / 0.4);
+}
+
+/* Score card */
+.sp-score-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1rem; padding: 1.25rem 1.5rem;
+  display: flex; align-items: center; gap: 1.25rem;
+  margin-bottom: 1.5rem; position: relative; overflow: hidden;
+}
+.sp-score-card::before {
+  content: ''; position: absolute; right: -1rem; top: -1rem;
+  width: 8rem; height: 8rem; border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.55 0.18 145 / 0.12), transparent 70%);
+  pointer-events: none;
+}
+.sp-score-icon {
+  width: 3.5rem; height: 3.5rem; border-radius: 50%;
+  background: linear-gradient(135deg, oklch(0.88 0.1 145), oklch(0.82 0.12 155));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; flex-shrink: 0;
+}
+.sp-score-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); }
+.sp-score-val { font-size: 2.25rem; font-weight: 800; color: var(--foreground); line-height: 1; }
+.sp-score-unit { font-size: .875rem; font-weight: 400; color: var(--muted-foreground); }
+.sp-score-meta { font-size: .75rem; color: var(--muted-foreground); margin-top: .25rem; }
+.sp-score-bar-wrap { flex: 1; display: none; }
+@media (min-width: 640px) { .sp-score-bar-wrap { display: block; } }
+.sp-score-track { height: .5rem; background: var(--muted); border-radius: 9999px; overflow: hidden; }
+.sp-score-fill { height: 100%; border-radius: 9999px; background: linear-gradient(90deg, oklch(0.55 0.22 145), oklch(0.45 0.2 155)); transition: width .6s ease; }
+.sp-score-pct { font-size: .72rem; color: var(--muted-foreground); text-align: right; margin-top: .3rem; }
+
+/* Add form */
+.sp-form-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1rem; overflow: hidden; margin-bottom: 1.5rem;
+  divide-y: 1px solid var(--border);
+}
+.sp-section { padding: 1.25rem 1.5rem; }
+.sp-section + .sp-section { border-top: 1px solid var(--border); }
+.sp-section-head { display: flex; align-items: center; gap: .65rem; margin-bottom: .75rem; }
+.sp-step {
+  width: 1.5rem; height: 1.5rem; border-radius: 50%;
+  background: linear-gradient(135deg, oklch(0.55 0.22 145), oklch(0.45 0.2 155));
+  color: #fff; font-size: .72rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.sp-section-title { font-size: .875rem; font-weight: 700; color: var(--foreground); }
+.sp-section-desc { font-size: .78rem; color: var(--muted-foreground); margin-bottom: 1rem; }
+
+.sp-dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .75rem;
+  border: 2px dashed var(--border); border-radius: .85rem; padding: 2.5rem 1rem;
+  cursor: pointer; transition: border-color .2s, background .2s;
+}
+.sp-dropzone:hover { border-color: oklch(0.55 0.2 145 / 0.6); background: oklch(0.55 0.2 145 / 0.04); }
+.sp-dropzone-icon { color: var(--muted-foreground); }
+.sp-dropzone-text { font-size: .85rem; font-weight: 600; color: var(--foreground); }
+.sp-dropzone-sub { font-size: .75rem; color: var(--muted-foreground); }
+
+.sp-preview-row { display: flex; flex-direction: column; gap: 1rem; }
+@media (min-width: 640px) { .sp-preview-row { flex-direction: row; } }
+.sp-img-wrap { position: relative; flex-shrink: 0; }
+.sp-cert-img {
+  height: 10rem; width: auto; max-width: 12rem; border-radius: .6rem;
+  border: 1px solid var(--border); object-fit: contain; background: var(--muted);
+}
+.sp-img-remove {
+  position: absolute; top: -.4rem; right: -.4rem;
+  width: 1.5rem; height: 1.5rem; border-radius: 50%;
+  background: oklch(0.55 0.22 25); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  border: none; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.sp-scan-col { display: flex; flex-direction: column; justify-content: center; gap: .75rem; }
+.sp-filename { font-size: .75rem; color: var(--muted-foreground); max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-scan-btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  background: linear-gradient(135deg, oklch(0.55 0.22 145), oklch(0.45 0.2 155));
+  color: #fff; border: none; border-radius: .6rem;
+  padding: .55rem 1.1rem; font-size: .8rem; font-weight: 600;
+  cursor: pointer; transition: opacity .2s; width: fit-content;
+}
+.sp-scan-btn:hover { opacity: .88; }
+.sp-scan-btn:disabled { opacity: .55; cursor: not-allowed; }
+.sp-scan-msg { font-size: .75rem; }
+.sp-scan-ok { color: oklch(0.45 0.18 145); }
+.sp-scan-err { color: oklch(0.5 0.22 25); }
+
+.sp-form-grid { display: grid; grid-template-columns: 1fr; gap: .85rem; }
+@media (min-width: 640px) { .sp-form-grid { grid-template-columns: repeat(2, 1fr); } }
+.sp-field-label { font-size: .72rem; font-weight: 600; color: var(--muted-foreground); margin-bottom: .4rem; display: block; }
+.sp-req { color: oklch(0.55 0.22 25); }
+.sp-input {
+  width: 100%; border: 1px solid var(--border); background: var(--background);
+  border-radius: .55rem; padding: .5rem .75rem; font-size: .83rem;
+  color: var(--foreground); outline: none; transition: border-color .2s, box-shadow .2s;
+  box-sizing: border-box;
+}
+.sp-input:focus { border-color: oklch(0.55 0.22 145); box-shadow: 0 0 0 3px oklch(0.55 0.22 145 / 0.15); }
+.sp-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .5rem center; background-size: 1rem; padding-right: 2rem; }
+
+.sp-form-actions { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; gap: .5rem; }
+.sp-btn-primary {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: linear-gradient(135deg, oklch(0.55 0.22 145), oklch(0.45 0.2 155));
+  color: #fff; border: none; border-radius: .6rem;
+  padding: .55rem 1.25rem; font-size: .83rem; font-weight: 600;
+  cursor: pointer; transition: opacity .2s;
+}
+.sp-btn-primary:hover { opacity: .88; }
+.sp-btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+.sp-btn-ghost {
+  display: inline-flex; align-items: center;
+  background: transparent; color: var(--muted-foreground);
+  border: 1px solid var(--border); border-radius: .6rem;
+  padding: .55rem 1.25rem; font-size: .83rem; font-weight: 500;
+  cursor: pointer; transition: background .15s;
+}
+.sp-btn-ghost:hover { background: var(--accent); color: var(--foreground); }
+
+/* Achievement grid */
+.sp-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 640px) { .sp-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 900px) { .sp-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.sp-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1rem; overflow: hidden; display: flex; flex-direction: column;
+  transition: box-shadow .2s, border-color .2s;
+}
+.sp-card:hover { border-color: oklch(0.6 0.18 145 / 0.35); box-shadow: 0 4px 18px oklch(0.5 0.18 145 / 0.1); }
+.sp-cert-preview { height: 9rem; background: var(--muted); overflow: hidden; }
+.sp-cert-preview img { width: 100%; height: 100%; object-fit: contain; }
+.sp-card-body { padding: 1rem; display: flex; flex-direction: column; gap: .75rem; flex: 1; }
+.sp-card-top { display: flex; align-items: flex-start; justify-content: space-between; }
+.sp-card-left { display: flex; align-items: center; gap: .65rem; }
+.sp-type-icon { font-size: 1.5rem; line-height: 1; }
+.sp-sport-name { font-weight: 700; font-size: .875rem; color: var(--foreground); line-height: 1.2; }
+.sp-type-badge {
+  display: inline-block; font-size: .68rem; font-weight: 600;
+  padding: .15rem .5rem; border-radius: .35rem; margin-top: .3rem;
+}
+.sp-card-actions { display: flex; gap: .2rem; flex-shrink: 0; }
+.sp-icon-btn {
+  padding: .35rem; border-radius: .4rem; border: none; background: transparent;
+  color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center;
+  transition: background .15s, color .15s;
+}
+.sp-icon-btn:hover { background: var(--accent); color: var(--foreground); }
+.sp-icon-btn.del:hover { background: oklch(0.95 0.05 25); color: oklch(0.55 0.22 25); }
+
+.sp-card-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; border-top: 1px solid var(--border); padding-top: .65rem; margin-top: auto; }
+.sp-stat-label { font-size: .68rem; color: var(--muted-foreground); }
+.sp-stat-val { font-size: .8rem; font-weight: 700; color: var(--foreground); margin-top: .1rem; }
+.sp-stat-pts { color: oklch(0.45 0.2 145); }
+
+/* Empty */
+.sp-empty { text-align: center; padding: 4rem 1rem; color: var(--muted-foreground); }
+.sp-empty-icon { font-size: 2.75rem; margin-bottom: .75rem; }
+
+/* Error */
+.sp-err {
+  background: oklch(0.97 0.05 25 / 0.5); border: 1px solid oklch(0.85 0.1 25);
+  border-radius: .65rem; padding: .75rem 1rem; font-size: .82rem;
+  color: oklch(0.5 0.2 25); margin-bottom: 1rem;
+}
+
+/* Modal */
+.sp-modal-bg {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem; background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+}
+.sp-modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1rem; width: 100%; max-width: 26rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  animation: spModalIn .2s ease;
+}
+@keyframes spModalIn {
+  from { opacity: 0; transform: scale(.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.sp-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border);
+}
+.sp-modal-title { font-weight: 700; color: var(--foreground); font-size: .95rem; }
+.sp-modal-close {
+  padding: .3rem; border-radius: .4rem; border: none; background: transparent;
+  color: var(--muted-foreground); cursor: pointer;
+}
+.sp-modal-close:hover { background: var(--accent); color: var(--foreground); }
+.sp-modal-body { padding: 1.4rem; display: flex; flex-direction: column; gap: .85rem; }
+.sp-modal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .85rem; }
+.sp-modal-actions { display: flex; gap: .5rem; padding-top: .35rem; }
+`
 
 export default function SportsPage() {
   const pathname = usePathname()
@@ -46,20 +279,17 @@ export default function SportsPage() {
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState("")
 
-  // ── Add form state ────────────────────────────────────────────────────────
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [formError, setFormError] = useState("")
   const [saving, setSaving] = useState(false)
 
-  // ── Certificate scan state ────────────────────────────────────────────────
   const [certFile, setCertFile] = useState<File | null>(null)
   const [certPreview, setCertPreview] = useState<string | null>(null)
-  const [certUrl, setCertUrl] = useState<string | null>(null)   // saved server path
+  const [certUrl, setCertUrl] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
   const [scanMsg, setScanMsg] = useState("")
 
-  // ── Edit state ────────────────────────────────────────────────────────────
   const [editEntry, setEditEntry] = useState<Achievement | null>(null)
   const [editSaving, setEditSaving] = useState(false)
 
@@ -71,118 +301,74 @@ export default function SportsPage() {
   }
   useEffect(() => { load() }, [])
 
-  const totalPoints  = achievements.reduce((s, a) => s + a.points, 0)
-  const sportsScore  = Math.min(totalPoints, 100)
+  const totalPoints = achievements.reduce((s, a) => s + a.points, 0)
+  const sportsScore = Math.min(totalPoints, 100)
 
-  // ── Certificate file picker ───────────────────────────────────────────────
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    setCertFile(f)
-    setCertPreview(URL.createObjectURL(f))
-    setCertUrl(null)
-    setScanMsg("")
+    setCertFile(f); setCertPreview(URL.createObjectURL(f)); setCertUrl(null); setScanMsg("")
   }
 
   function removeCert() {
-    setCertFile(null)
-    setCertPreview(null)
-    setCertUrl(null)
-    setScanMsg("")
+    setCertFile(null); setCertPreview(null); setCertUrl(null); setScanMsg("")
     if (fileRef.current) fileRef.current.value = ""
   }
 
-  // ── Scan certificate via Claude vision ───────────────────────────────────
   async function scanCertificate() {
     if (!certFile) return
-    setScanning(true)
-    setScanMsg("")
-    setFormError("")
-
+    setScanning(true); setScanMsg(""); setFormError("")
     const fd = new FormData()
     fd.append("image", certFile)
-
     try {
       const res = await fetch("/api/profile/sports/scan", { method: "POST", body: fd })
       const data = await res.json()
-
-      if (!res.ok) {
-        setScanMsg(data.error ?? "Scan failed.")
-        if (data.fileUrl) setCertUrl(data.fileUrl) // still save the file
-        return
-      }
-
-      // Auto-fill form from AI response
+      if (!res.ok) { setScanMsg(data.error ?? "Scan failed."); if (data.fileUrl) setCertUrl(data.fileUrl); return }
       setForm((prev) => ({
         ...prev,
-        sportName:       data.sportName      ?? prev.sportName,
+        sportName: data.sportName ?? prev.sportName,
         achievementType: data.achievementType ?? prev.achievementType,
-        position:        data.position        ?? prev.position,
-        date:            data.date            ?? prev.date,
-        points:          String(data.points   ?? prev.points),
-        eventName:       data.eventName       ?? prev.eventName,
+        position: data.position ?? prev.position,
+        date: data.date ?? prev.date,
+        points: String(data.points ?? prev.points),
+        eventName: data.eventName ?? prev.eventName,
       }))
       setCertUrl(data.fileUrl)
       setScanMsg("Certificate scanned — fields auto-filled. Review and adjust if needed.")
-    } catch {
-      setScanMsg("Scan error. Please fill in the details manually.")
-    } finally {
-      setScanning(false)
-    }
+    } catch { setScanMsg("Scan error. Please fill in details manually.") }
+    finally { setScanning(false) }
   }
 
-  // ── Add achievement ───────────────────────────────────────────────────────
   async function addAchievement() {
-    if (!form.sportName || !form.date) {
-      setFormError("Sport name and date are required.")
-      return
-    }
-    setSaving(true)
-    setFormError("")
-
+    if (!form.sportName || !form.date) { setFormError("Sport name and date are required."); return }
+    setSaving(true); setFormError("")
     const res = await fetch("/api/profile/sports", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sportName:           form.sportName,
-        achievementType:     form.achievementType,
-        position:            form.position || null,
-        date:                form.date,
-        points:              Number(form.points),
-        certificateUrl:      certUrl,
-        certificateFileName: certFile?.name,
+        sportName: form.sportName, achievementType: form.achievementType,
+        position: form.position || null, date: form.date, points: Number(form.points),
+        certificateUrl: certUrl, certificateFileName: certFile?.name,
       }),
     })
     const data = await res.json()
     if (!res.ok) { setFormError(data.error ?? "Failed to add."); setSaving(false); return }
-
     setAchievements((prev) => [data, ...prev])
-    setForm(EMPTY_FORM)
-    removeCert()
-    setShowForm(false)
-    setSaving(false)
+    setForm(EMPTY_FORM); removeCert(); setShowForm(false); setSaving(false)
   }
 
-  // ── Update achievement ────────────────────────────────────────────────────
   async function updateAchievement() {
     if (!editEntry) return
     setEditSaving(true)
     const res = await fetch(`/api/profile/sports/${editEntry.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sportName: editEntry.sportName, achievementType: editEntry.achievementType,
-        position: editEntry.position, date: editEntry.date, points: editEntry.points,
-      }),
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sportName: editEntry.sportName, achievementType: editEntry.achievementType, position: editEntry.position, date: editEntry.date, points: editEntry.points }),
     })
     const data = await res.json()
     if (res.ok) setAchievements((prev) => prev.map((a) => (a.id === data.id ? data : a)))
     else setPageError(data.error ?? "Failed to update.")
-    setEditEntry(null)
-    setEditSaving(false)
+    setEditEntry(null); setEditSaving(false)
   }
 
-  // ── Delete ────────────────────────────────────────────────────────────────
   async function deleteAchievement(id: number) {
     if (!confirm("Delete this achievement?")) return
     const res = await fetch(`/api/profile/sports/${id}`, { method: "DELETE" })
@@ -191,21 +377,16 @@ export default function SportsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Sports Achievements</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Record trophies, medals, and certificates. Upload a certificate image to auto-scan details.
-          </p>
-        </div>
+    <div className="sp-wrap">
+      <style>{CSS}</style>
+
+      {/* Hero */}
+      <div className="sp-hero">
+        <h1 className="sp-hero-title">Sports Achievements</h1>
+        <p className="sp-hero-sub">Record trophies, medals, and certificates. Upload a certificate to auto-scan.</p>
         {!showForm && (
-          <button
-            onClick={() => { setShowForm(true); setFormError("") }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+          <button className="sp-hero-add" onClick={() => { setShowForm(true); setFormError("") }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Add Achievement
@@ -214,311 +395,254 @@ export default function SportsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border overflow-x-auto">
+      <div className="sp-tabs">
         {TABS.map((t) => (
-          <Link key={t.href} href={t.href}
-            className={`shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              pathname === t.href ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
+          <Link key={t.href} href={t.href} className={`sp-tab${pathname === t.href ? " active" : ""}`}>
             {t.label}
           </Link>
         ))}
       </div>
 
-      {/* Score bar */}
-      <div className="bg-card border border-border rounded-xl p-5 flex items-center gap-5">
-        <div className="h-14 w-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-2xl shrink-0">🏃</div>
+      {/* Score card */}
+      <div className="sp-score-card">
+        <div className="sp-score-icon">🏃</div>
         <div>
-          <p className="text-xs text-muted-foreground font-medium">Sports Score</p>
-          <p className="text-3xl font-bold text-foreground">
-            {sportsScore}<span className="text-base font-normal text-muted-foreground"> / 100</span>
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {achievements.length} achievement{achievements.length !== 1 ? "s" : ""} · {totalPoints} total points
-          </p>
+          <p className="sp-score-label">Sports Score</p>
+          <p className="sp-score-val">{sportsScore}<span className="sp-score-unit"> / 100</span></p>
+          <p className="sp-score-meta">{achievements.length} achievement{achievements.length !== 1 ? "s" : ""} · {totalPoints} total pts</p>
         </div>
-        <div className="ml-auto hidden sm:block">
-          <div className="h-3 w-48 rounded-full bg-muted overflow-hidden">
-            <div className="h-full rounded-full bg-green-500 transition-all duration-500" style={{ width: `${sportsScore}%` }} />
+        <div className="sp-score-bar-wrap">
+          <div className="sp-score-track">
+            <div className="sp-score-fill" style={{ width: `${sportsScore}%` }} />
           </div>
+          <p className="sp-score-pct">{sportsScore}%</p>
         </div>
       </div>
 
-      {pageError && (
-        <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">{pageError}</div>
-      )}
+      {pageError && <div className="sp-err">{pageError}</div>}
 
-      {/* ── Add Achievement Form ─────────────────────────────────────────────── */}
+      {/* Add form */}
       {showForm && (
-        <div className="bg-card border border-border rounded-xl divide-y divide-border">
-          {/* Section 1 — Upload & Scan */}
-          <div className="p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
-              <h3 className="text-sm font-semibold text-foreground">Upload Certificate (optional)</h3>
+        <div className="sp-form-card" style={{ marginBottom: "1.5rem" }}>
+          {/* Step 1 — Upload */}
+          <div className="sp-section">
+            <div className="sp-section-head">
+              <span className="sp-step">1</span>
+              <h3 className="sp-section-title">Upload Certificate (optional)</h3>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Upload a photo of your certificate or trophy. Click <strong>Scan Certificate</strong> to auto-fill the details below using AI.
-            </p>
-
+            <p className="sp-section-desc">Upload a photo of your certificate or trophy, then click <strong>Scan Certificate</strong> to auto-fill details with AI.</p>
             {!certPreview ? (
-              /* Drop zone */
-              <label className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-border rounded-xl p-8 cursor-pointer hover:border-primary hover:bg-accent/30 transition-colors">
-                <svg className="h-10 w-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+              <label className="sp-dropzone">
+                <svg className="sp-dropzone-icon" width="40" height="40" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-foreground">Click to upload certificate</p>
-                  <p className="text-xs text-muted-foreground mt-1">JPG, PNG or WebP · max 5 MB</p>
-                </div>
-                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
+                <span className="sp-dropzone-text">Click to upload certificate</span>
+                <span className="sp-dropzone-sub">JPG, PNG or WebP · max 5 MB</span>
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={handleFileChange} />
               </label>
             ) : (
-              /* Preview + scan actions */
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative shrink-0">
+              <div className="sp-preview-row">
+                <div className="sp-img-wrap">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={certPreview} alt="Certificate preview" className="h-40 w-auto max-w-[200px] rounded-lg border border-border object-contain bg-muted" />
-                  <button
-                    type="button"
-                    onClick={removeCert}
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-sm hover:opacity-90"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  <img src={certPreview} alt="Certificate preview" className="sp-cert-img" />
+                  <button type="button" className="sp-img-remove" onClick={removeCert}>
+                    <svg width="10" height="10" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
-
-                <div className="flex flex-col justify-center gap-3">
-                  <p className="text-xs text-muted-foreground font-medium truncate max-w-[220px]">{certFile?.name}</p>
-                  <button
-                    type="button"
-                    onClick={scanCertificate}
-                    disabled={scanning}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-60 transition w-fit"
-                  >
+                <div className="sp-scan-col">
+                  <p className="sp-filename">{certFile?.name}</p>
+                  <button type="button" className="sp-scan-btn" onClick={scanCertificate} disabled={scanning}>
                     {scanning ? (
                       <>
-                        <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" className="animate-spin">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: .25 }} />
+                          <path fill="currentColor" d="M4 12a8 8 0 018-8v8z" style={{ opacity: .75 }} />
                         </svg>
                         Scanning…
                       </>
                     ) : (
                       <>
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3.75H6A2.25 2.25 0 0 0 3.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0 1 20.25 6v1.5m0 9V18A2.25 2.25 0 0 1 18 20.25h-1.5m-9 0H6A2.25 2.25 0 0 1 3.75 18v-1.5M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3.75H6A2.25 2.25 0 003.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0120.25 6v1.5m0 9V18A2.25 2.25 0 0118 20.25h-1.5m-9 0H6A2.25 2.25 0 013.75 18v-1.5M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         Scan Certificate
                       </>
                     )}
                   </button>
                   {scanMsg && (
-                    <p className={`text-xs ${scanMsg.includes("auto-filled") ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
-                      {scanMsg}
-                    </p>
+                    <p className={`sp-scan-msg ${scanMsg.includes("auto-filled") ? "sp-scan-ok" : "sp-scan-err"}`}>{scanMsg}</p>
                   )}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Section 2 — Fields */}
-          <div className="p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
-              <h3 className="text-sm font-semibold text-foreground">Achievement Details</h3>
+          {/* Step 2 — Details */}
+          <div className="sp-section">
+            <div className="sp-section-head">
+              <span className="sp-step">2</span>
+              <h3 className="sp-section-title">Achievement Details</h3>
             </div>
-
-            {formError && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2.5 text-sm text-destructive">{formError}</div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {formError && <div className="sp-err" style={{ marginBottom: ".75rem" }}>{formError}</div>}
+            <div className="sp-form-grid">
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Sport / Event Name <span className="text-destructive">*</span></label>
-                <input placeholder="e.g. Badminton" value={form.sportName}
-                  onChange={(e) => setForm((p) => ({ ...p, sportName: e.target.value }))} className={INPUT} />
+                <label className="sp-field-label">Sport / Event Name <span className="sp-req">*</span></label>
+                <input className="sp-input" placeholder="e.g. Badminton" value={form.sportName}
+                  onChange={(e) => setForm((p) => ({ ...p, sportName: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Achievement Type</label>
-                <select value={form.achievementType}
-                  onChange={(e) => setForm((p) => ({ ...p, achievementType: e.target.value }))} className={INPUT}>
-                  {ACHIEVEMENT_TYPES.map((t) => (
-                    <option key={t} value={t}>{TYPE_ICON[t]} {t.charAt(0) + t.slice(1).toLowerCase()}</option>
-                  ))}
+                <label className="sp-field-label">Achievement Type</label>
+                <select className="sp-input sp-select" value={form.achievementType}
+                  onChange={(e) => setForm((p) => ({ ...p, achievementType: e.target.value }))}>
+                  {ACHIEVEMENT_TYPES.map((t) => <option key={t} value={t}>{TYPE_ICON[t]} {t.charAt(0) + t.slice(1).toLowerCase()}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Position / Place</label>
-                <input placeholder="e.g. 1st, Champion, Runner-up" value={form.position}
-                  onChange={(e) => setForm((p) => ({ ...p, position: e.target.value }))} className={INPUT} />
+                <label className="sp-field-label">Position / Place</label>
+                <input className="sp-input" placeholder="e.g. 1st, Champion, Runner-up" value={form.position}
+                  onChange={(e) => setForm((p) => ({ ...p, position: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Date <span className="text-destructive">*</span></label>
-                <input type="date" value={form.date} max={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} className={INPUT} />
+                <label className="sp-field-label">Date <span className="sp-req">*</span></label>
+                <input className="sp-input" type="date" value={form.date}
+                  max={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Points Awarded</label>
-                <input type="number" min={0} value={form.points}
-                  onChange={(e) => setForm((p) => ({ ...p, points: e.target.value }))} className={INPUT} />
+                <label className="sp-field-label">Points Awarded</label>
+                <input className="sp-input" type="number" min={0} value={form.points}
+                  onChange={(e) => setForm((p) => ({ ...p, points: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Competition / Event Name</label>
-                <input placeholder="e.g. Inter-university Games 2024" value={form.eventName}
-                  onChange={(e) => setForm((p) => ({ ...p, eventName: e.target.value }))} className={INPUT} />
+                <label className="sp-field-label">Competition / Event Name</label>
+                <input className="sp-input" placeholder="e.g. Inter-university Games 2024" value={form.eventName}
+                  onChange={(e) => setForm((p) => ({ ...p, eventName: e.target.value }))} />
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="px-5 py-4 flex gap-2">
-            <button onClick={addAchievement} disabled={saving}
-              className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-60 transition">
-              {saving ? "Saving…" : "Add Achievement"}
-            </button>
-            <button
-              onClick={() => { setShowForm(false); setForm(EMPTY_FORM); removeCert(); setFormError("") }}
-              className="px-5 py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-accent transition">
-              Cancel
-            </button>
+          <div className="sp-form-actions">
+            <button className="sp-btn-primary" onClick={addAchievement} disabled={saving}>{saving ? "Saving…" : "Add Achievement"}</button>
+            <button className="sp-btn-ghost" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); removeCert(); setFormError("") }}>Cancel</button>
           </div>
         </div>
       )}
 
-      {/* ── Achievement list ──────────────────────────────────────────────────── */}
+      {/* Achievement list */}
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <div style={{ textAlign: "center", padding: "3rem", color: "var(--muted-foreground)", fontSize: ".875rem" }}>Loading…</div>
       ) : achievements.length === 0 ? (
-        <div className="text-center py-14 text-muted-foreground">
-          <p className="text-4xl mb-3">🏆</p>
-          <p className="text-base mb-1 font-medium">No achievements recorded yet.</p>
-          <p className="text-sm">Upload a certificate or add your sports achievements to boost your score.</p>
+        <div className="sp-empty">
+          <div className="sp-empty-icon">🏆</div>
+          <p style={{ fontWeight: 600, marginBottom: ".25rem" }}>No achievements recorded yet.</p>
+          <p style={{ fontSize: ".82rem" }}>Upload a certificate or add your sports achievements to boost your score.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {achievements.map((ach) => (
-            <div key={ach.id} className="bg-card border border-border rounded-xl overflow-hidden flex flex-col">
-              {/* Certificate image */}
-              {ach.fileAsset?.fileUrl && (
-                <div className="h-36 bg-muted overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={ach.fileAsset.fileUrl}
-                    alt="Certificate"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              )}
-
-              <div className="p-4 flex flex-col gap-3 flex-1">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl leading-none">{TYPE_ICON[ach.achievementType] ?? "🏅"}</span>
-                    <div>
-                      <p className="font-semibold text-foreground text-sm leading-tight">{ach.sportName}</p>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${TYPE_COLOR[ach.achievementType] ?? ""}`}>
-                        {ach.achievementType.charAt(0) + ach.achievementType.slice(1).toLowerCase()}
-                      </span>
+        <div className="sp-grid">
+          {achievements.map((ach) => {
+            const ts = TYPE_STYLE[ach.achievementType] ?? TYPE_STYLE.TROPHY
+            return (
+              <div key={ach.id} className="sp-card">
+                {ach.fileAsset?.fileUrl && (
+                  <div className="sp-cert-preview">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={ach.fileAsset.fileUrl} alt="Certificate" />
+                  </div>
+                )}
+                <div className="sp-card-body">
+                  <div className="sp-card-top">
+                    <div className="sp-card-left">
+                      <span className="sp-type-icon">{TYPE_ICON[ach.achievementType] ?? "🏅"}</span>
+                      <div>
+                        <p className="sp-sport-name">{ach.sportName}</p>
+                        <span className="sp-type-badge" style={{ background: ts.bg, color: ts.fg }}>
+                          {ach.achievementType.charAt(0) + ach.achievementType.slice(1).toLowerCase()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="sp-card-actions">
+                      <button className="sp-icon-btn" onClick={() => setEditEntry({ ...ach })}>
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                        </svg>
+                      </button>
+                      <button className="sp-icon-btn del" onClick={() => deleteAchievement(ach.id)}>
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <button onClick={() => setEditEntry({ ...ach })}
-                      className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                      </svg>
-                    </button>
-                    <button onClick={() => deleteAchievement(ach.id)}
-                      className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs border-t border-border pt-3 mt-auto">
-                  {ach.position && (
+                  <div className="sp-card-stats">
+                    {ach.position && (
+                      <div>
+                        <p className="sp-stat-label">Position</p>
+                        <p className="sp-stat-val">{ach.position}</p>
+                      </div>
+                    )}
                     <div>
-                      <span className="text-muted-foreground">Position</span>
-                      <p className="font-semibold text-foreground mt-0.5">{ach.position}</p>
+                      <p className="sp-stat-label">Points</p>
+                      <p className="sp-stat-val sp-stat-pts">+{ach.points} pts</p>
                     </div>
-                  )}
-                  <div>
-                    <span className="text-muted-foreground">Points</span>
-                    <p className="font-bold text-green-600 dark:text-green-400 mt-0.5">+{ach.points} pts</p>
-                  </div>
-                  <div className={ach.position ? "" : "col-span-2"}>
-                    <span className="text-muted-foreground">Date</span>
-                    <p className="font-medium text-foreground mt-0.5">
-                      {new Date(ach.date).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })}
-                    </p>
+                    <div className={ach.position ? "" : "col-span-2"}>
+                      <p className="sp-stat-label">Date</p>
+                      <p className="sp-stat-val">{new Date(ach.date).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {/* ── Edit Modal ─────────────────────────────────────────────────────────── */}
+      {/* Edit Modal */}
       {editEntry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-card border border-border rounded-xl w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <h3 className="font-semibold text-foreground">Edit Achievement</h3>
-              <button onClick={() => setEditEntry(null)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <div className="sp-modal-bg">
+          <div className="sp-modal">
+            <div className="sp-modal-head">
+              <span className="sp-modal-title">Edit Achievement</span>
+              <button className="sp-modal-close" onClick={() => setEditEntry(null)}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="sp-modal-body">
+              <div className="sp-modal-grid">
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Sport Name</label>
-                  <input value={editEntry.sportName}
-                    onChange={(e) => setEditEntry((p) => p ? { ...p, sportName: e.target.value } : null)} className={INPUT} />
+                  <label className="sp-field-label">Sport Name</label>
+                  <input className="sp-input" value={editEntry.sportName}
+                    onChange={(e) => setEditEntry((p) => p ? { ...p, sportName: e.target.value } : null)} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Type</label>
-                  <select value={editEntry.achievementType}
-                    onChange={(e) => setEditEntry((p) => p ? { ...p, achievementType: e.target.value } : null)} className={INPUT}>
-                    {ACHIEVEMENT_TYPES.map((t) => (
-                      <option key={t} value={t}>{TYPE_ICON[t]} {t.charAt(0) + t.slice(1).toLowerCase()}</option>
-                    ))}
+                  <label className="sp-field-label">Type</label>
+                  <select className="sp-input sp-select" value={editEntry.achievementType}
+                    onChange={(e) => setEditEntry((p) => p ? { ...p, achievementType: e.target.value } : null)}>
+                    {ACHIEVEMENT_TYPES.map((t) => <option key={t} value={t}>{TYPE_ICON[t]} {t.charAt(0) + t.slice(1).toLowerCase()}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Position</label>
-                  <input value={editEntry.position ?? ""}
-                    onChange={(e) => setEditEntry((p) => p ? { ...p, position: e.target.value || null } : null)} className={INPUT} />
+                  <label className="sp-field-label">Position</label>
+                  <input className="sp-input" value={editEntry.position ?? ""}
+                    onChange={(e) => setEditEntry((p) => p ? { ...p, position: e.target.value || null } : null)} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Points</label>
-                  <input type="number" min={0} value={editEntry.points}
-                    onChange={(e) => setEditEntry((p) => p ? { ...p, points: Number(e.target.value) } : null)} className={INPUT} />
+                  <label className="sp-field-label">Points</label>
+                  <input className="sp-input" type="number" min={0} value={editEntry.points}
+                    onChange={(e) => setEditEntry((p) => p ? { ...p, points: Number(e.target.value) } : null)} />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Date</label>
-                <input type="date" value={new Date(editEntry.date).toISOString().split("T")[0]}
-                  onChange={(e) => setEditEntry((p) => p ? { ...p, date: e.target.value } : null)} className={INPUT} />
+                <label className="sp-field-label">Date</label>
+                <input className="sp-input" type="date" value={new Date(editEntry.date).toISOString().split("T")[0]}
+                  onChange={(e) => setEditEntry((p) => p ? { ...p, date: e.target.value } : null)} />
               </div>
-              <div className="flex gap-2 pt-1">
-                <button onClick={updateAchievement} disabled={editSaving}
-                  className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-60 transition">
-                  {editSaving ? "Saving…" : "Save Changes"}
-                </button>
-                <button onClick={() => setEditEntry(null)}
-                  className="px-5 py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-accent transition">
-                  Cancel
-                </button>
+              <div className="sp-modal-actions">
+                <button className="sp-btn-primary" onClick={updateAchievement} disabled={editSaving}>{editSaving ? "Saving…" : "Save Changes"}</button>
+                <button className="sp-btn-ghost" onClick={() => setEditEntry(null)}>Cancel</button>
               </div>
             </div>
           </div>

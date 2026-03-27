@@ -1,83 +1,460 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useState, useEffect, useMemo } from "react"
 
-// ── Types ───────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type Application = { id: number; status: string }
-type Member = { id: number; isActive: boolean; role: string }
+type Member      = { id: number; isActive: boolean; role: string }
 
+type FullApplication = {
+  id: number; status: string; clubId: number;
+  motivation: string; currentYear: number | null;
+  currentSemester: number | null; gpa: number | null;
+  contribution: string | null; experience: string | null;
+  availableDays: string | null; createdAt: string;
+  club: { name: string; category: string }
+}
 type Club = {
-  id: number
-  name: string
-  category: string
-  status: string
-  description: string
-  requirements: string | null
-  capacity: number
-  logoUrl: string | null
-  email: string | null
-  social: string | null
-  applications: Application[]
-  members: Member[]
+  id: number; name: string; category: string; status: string
+  description: string; requirements: string | null
+  capacity: number; logoUrl: string | null
+  email: string | null; social: string | null
+  applications: Application[]; members: Member[]
   _count: { members: number }
 }
 
-// ── Constants ───────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const CATEGORIES = ["ALL", "ACADEMIC", "SPORTS", "CULTURAL", "RELIGIOUS", "OTHER"]
 
-const CATEGORY_COLOR: Record<string, string> = {
-  ACADEMIC: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  SPORTS: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  CULTURAL: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  RELIGIOUS: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  OTHER: "bg-muted text-muted-foreground",
+const CAT_META: Record<string, { icon: string; bg: string; fg: string; hero: string }> = {
+  ACADEMIC: { icon: "🎓", bg: "oklch(0.93 0.05 250)", fg: "oklch(0.42 0.2 250)",  hero: "oklch(0.55 0.2 250)" },
+  SPORTS:   { icon: "⚽", bg: "oklch(0.93 0.06 145)", fg: "oklch(0.4 0.2 145)",   hero: "oklch(0.5 0.2 145)"  },
+  CULTURAL: { icon: "🎭", bg: "oklch(0.93 0.06 295)", fg: "oklch(0.42 0.2 295)",  hero: "oklch(0.5 0.2 295)"  },
+  RELIGIOUS:{ icon: "☪️", bg: "oklch(0.94 0.06 55)",  fg: "oklch(0.45 0.2 55)",   hero: "oklch(0.52 0.18 55)" },
+  OTHER:    { icon: "✦",  bg: "oklch(0.94 0.02 260)", fg: "oklch(0.45 0.06 260)", hero: "oklch(0.5 0.1 260)"  },
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  OPEN: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  FULL: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  CLOSED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+const STATUS_META: Record<string, { label: string; bg: string; fg: string; dot: string }> = {
+  OPEN:   { label: "Open",   bg: "oklch(0.93 0.06 145)", fg: "oklch(0.4 0.2 145)",  dot: "oklch(0.55 0.2 145)"  },
+  FULL:   { label: "Full",   bg: "oklch(0.94 0.06 55)",  fg: "oklch(0.45 0.2 55)",  dot: "oklch(0.6 0.18 55)"   },
+  CLOSED: { label: "Closed", bg: "oklch(0.95 0.05 25)",  fg: "oklch(0.5 0.22 25)",  dot: "oklch(0.6 0.22 25)"   },
 }
 
-const APPLICATION_STYLE: Record<string, string> = {
-  PENDING: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  APPROVED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  REJECTED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  WAITLISTED: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+const APP_META: Record<string, { label: string; bg: string; fg: string }> = {
+  PENDING:    { label: "Pending",    bg: "oklch(0.95 0.06 80)",  fg: "oklch(0.48 0.2 80)"  },
+  APPROVED:   { label: "Approved",   bg: "oklch(0.93 0.06 145)", fg: "oklch(0.4 0.2 145)"  },
+  REJECTED:   { label: "Rejected",   bg: "oklch(0.95 0.05 25)",  fg: "oklch(0.5 0.22 25)"  },
+  WAITLISTED: { label: "Waitlisted", bg: "oklch(0.93 0.05 250)", fg: "oklch(0.42 0.2 250)" },
 }
 
-const INPUT =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+const cap = (s: string) => s.charAt(0) + s.slice(1).toLowerCase()
 
-const TEXTAREA =
-  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition resize-none"
+// ── CSS ──────────────────────────────────────────────────────────────────────
 
-// ── Component ───────────────────────────────────────────────────────────────
+const CSS = `
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ── Hero ── */
+.cb-hero {
+  border-radius: 1.25rem; overflow: hidden; margin-bottom: 1.75rem; position: relative;
+  background: linear-gradient(135deg,
+    oklch(0.22 0.1 265) 0%,
+    oklch(0.32 0.14 258) 55%,
+    oklch(0.42 0.16 252) 100%);
+  padding: 2rem 2rem 1.75rem;
+}
+.cb-hero::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.cb-hero-glow-a {
+  position: absolute; top: -80px; right: -80px; pointer-events: none;
+  width: 320px; height: 320px; border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.65 0.2 260 / 0.28) 0%, transparent 70%);
+}
+.cb-hero-glow-b {
+  position: absolute; bottom: -60px; left: -40px; pointer-events: none;
+  width: 220px; height: 220px; border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.45 0.22 280 / 0.22) 0%, transparent 70%);
+}
+.cb-hero-inner { position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+.cb-hero-tag {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .28rem .8rem; border-radius: 999px; margin-bottom: .85rem;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  font-size: .72rem; font-weight: 700; letter-spacing: .06em; color: rgba(255,255,255,.85); text-transform: uppercase;
+}
+.cb-hero-dot { width: 6px; height: 6px; border-radius: 50%; background: oklch(0.75 0.2 145); box-shadow: 0 0 6px oklch(0.75 0.2 145 / 0.8); animation: cbBlink 2s ease-in-out infinite; }
+@keyframes cbBlink { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+.cb-hero-title { font-size: 1.65rem; font-weight: 900; color: #fff; letter-spacing: -.04em; margin: 0 0 .4rem; line-height: 1.15; }
+.cb-hero-sub { font-size: .875rem; color: rgba(255,255,255,.65); line-height: 1.6; max-width: 440px; }
+.cb-hero-stats { display: flex; gap: .65rem; flex-wrap: wrap; padding-top: 1.65rem; }
+.cb-hero-stat {
+  display: flex; flex-direction: column; align-items: center;
+  padding: .7rem 1.1rem; border-radius: .85rem;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15);
+  min-width: 5.5rem; text-align: center; backdrop-filter: blur(8px);
+}
+.cb-hero-stat-val { font-size: 1.35rem; font-weight: 900; color: #fff; line-height: 1; }
+.cb-hero-stat-lbl { font-size: .65rem; font-weight: 600; color: rgba(255,255,255,.6); margin-top: .25rem; letter-spacing: .04em; text-transform: uppercase; }
+
+/* ── Toolbar ── */
+.cb-toolbar { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+.cb-search-wrap { flex: 1; min-width: 200px; position: relative; }
+.cb-search-icon { position: absolute; left: .85rem; top: 50%; transform: translateY(-50%); color: var(--muted-foreground); pointer-events: none; }
+.cb-search-icon svg { width: 15px; height: 15px; }
+.cb-search {
+  width: 100%; padding: .65rem .85rem .65rem 2.5rem;
+  border: 1.5px solid var(--border); border-radius: .75rem;
+  background: var(--background); color: var(--foreground);
+  font-size: .875rem; outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.cb-search:focus { border-color: oklch(0.62 0.2 260); box-shadow: 0 0 0 3px oklch(0.62 0.2 260 / 0.12); }
+.cb-search::placeholder { color: var(--muted-foreground); }
+
+/* ── Category pills ── */
+.cb-cats { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.cb-cat-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .45rem .9rem; border-radius: 999px;
+  font-size: .78rem; font-weight: 700; border: 1.5px solid var(--border);
+  background: var(--background); color: var(--muted-foreground);
+  cursor: pointer; transition: all .18s;
+}
+.cb-cat-btn:hover { border-color: oklch(0.62 0.2 260 / 0.45); color: var(--foreground); }
+.cb-cat-btn.active {
+  background: linear-gradient(135deg, oklch(0.62 0.2 260), oklch(0.5 0.22 265));
+  border-color: transparent; color: #fff;
+  box-shadow: 0 2px 10px oklch(0.6 0.2 260 / 0.3);
+}
+.cb-cat-count { font-size: .68rem; opacity: .75; font-weight: 600; }
+
+/* ── Stats strip ── */
+.cb-stats { display: flex; gap: .9rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.cb-stat-chip {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .3rem .8rem; border-radius: 999px;
+  background: var(--muted); border: 1px solid var(--border);
+  font-size: .75rem; font-weight: 600; color: var(--muted-foreground);
+}
+.cb-stat-chip.open { background: oklch(0.93 0.06 145 / 0.5); border-color: oklch(0.82 0.1 145); color: oklch(0.38 0.18 145); }
+.cb-stat-chip.member { background: oklch(0.93 0.06 250 / 0.4); border-color: oklch(0.82 0.08 250); color: oklch(0.42 0.18 250); }
+.cb-stat-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ── Grid ── */
+.cb-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.1rem; }
+@media (max-width: 900px) { .cb-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 560px) { .cb-grid { grid-template-columns: 1fr; } }
+
+/* ── Skeleton ── */
+.cb-skel { background: var(--muted); border-radius: 1.15rem; animation: cbSkel 1.4s ease-in-out infinite; }
+@keyframes cbSkel { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+/* ── Empty ── */
+.cb-empty { text-align: center; padding: 4rem 1.5rem; display: flex; flex-direction: column; align-items: center; gap: .6rem; }
+.cb-empty-icon { width: 5rem; height: 5rem; border-radius: 1.35rem; background: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 2.25rem; margin-bottom: .35rem; }
+.cb-empty-title { font-size: 1rem; font-weight: 700; color: var(--foreground); }
+.cb-empty-sub { font-size: .875rem; color: var(--muted-foreground); }
+
+/* ── Club card ── */
+.cb-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1.15rem; overflow: hidden; display: flex; flex-direction: column;
+  transition: box-shadow .2s, border-color .2s, transform .2s;
+}
+.cb-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.09); border-color: oklch(0.84 0.008 260); transform: translateY(-2px); }
+
+.cb-card-top { height: 5px; }
+
+.cb-card-body { padding: 1.2rem; flex: 1; display: flex; flex-direction: column; gap: .85rem; }
+
+.cb-card-header { display: flex; align-items: flex-start; gap: .85rem; }
+.cb-card-logo {
+  width: 3rem; height: 3rem; border-radius: .85rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.35rem; font-weight: 900; color: #fff;
+  overflow: hidden;
+}
+.cb-card-logo img { width: 100%; height: 100%; object-fit: cover; }
+.cb-card-name { font-size: .925rem; font-weight: 800; color: var(--foreground); line-height: 1.3; margin-bottom: .4rem; }
+.cb-badges { display: flex; gap: .35rem; flex-wrap: wrap; }
+.cb-badge {
+  display: inline-flex; align-items: center; gap: .25rem;
+  padding: .18rem .55rem; border-radius: 999px;
+  font-size: .67rem; font-weight: 700; letter-spacing: .02em;
+}
+.cb-status-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+.cb-desc {
+  font-size: .8rem; color: var(--muted-foreground); line-height: 1.65;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* Capacity bar */
+.cb-cap-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: .4rem; }
+.cb-cap-label { font-size: .72rem; color: var(--muted-foreground); font-weight: 600; }
+.cb-cap-val { font-size: .72rem; font-weight: 700; color: var(--foreground); }
+.cb-cap-track { height: 5px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.cb-cap-fill { height: 100%; border-radius: 999px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+
+.cb-card-email { font-size: .72rem; color: var(--muted-foreground); display: flex; align-items: center; gap: .35rem; }
+.cb-card-email svg { width: 11px; height: 11px; flex-shrink: 0; }
+
+/* Card footer */
+.cb-card-footer {
+  padding: .8rem 1.2rem; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: .65rem;
+}
+.cb-details-btn {
+  font-size: .78rem; font-weight: 600; color: var(--muted-foreground); background: none; border: none; cursor: pointer;
+  padding: .35rem .65rem; border-radius: .5rem; transition: color .15s, background .15s;
+  display: flex; align-items: center; gap: .3rem;
+}
+.cb-details-btn:hover { color: var(--foreground); background: var(--accent); }
+.cb-details-btn svg { width: 12px; height: 12px; }
+.cb-apply-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem 1rem; border-radius: .65rem;
+  background: linear-gradient(135deg, oklch(0.62 0.2 260), oklch(0.5 0.22 265));
+  color: #fff; font-size: .78rem; font-weight: 800; border: none; cursor: pointer;
+  box-shadow: 0 2px 10px oklch(0.6 0.2 260 / 0.3);
+  transition: opacity .18s, transform .15s;
+}
+.cb-apply-btn:hover { opacity: .9; transform: translateY(-1px); }
+.cb-member-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .35rem .8rem; border-radius: 999px;
+  background: oklch(0.93 0.06 145 / 0.5); color: oklch(0.38 0.18 145);
+  border: 1px solid oklch(0.82 0.1 145 / 0.5);
+  font-size: .75rem; font-weight: 700;
+}
+.cb-status-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .35rem .8rem; border-radius: 999px;
+  font-size: .75rem; font-weight: 700; border: 1px solid transparent;
+}
+
+/* ── Modal backdrop ── */
+.cb-backdrop {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  animation: cbFadeIn .2s ease;
+}
+@keyframes cbFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── Modal ── */
+.cb-modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1.35rem; width: 100%; max-width: 520px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.25);
+  max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;
+  animation: cbSlideUp .28s cubic-bezier(.22,1,.36,1);
+}
+@keyframes cbSlideUp { from { opacity: 0; transform: translateY(20px) scale(.97); } to { opacity: 1; transform: none; } }
+.cb-modal::-webkit-scrollbar { width: 4px; }
+.cb-modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.cb-modal-top { height: 5px; border-radius: 1.35rem 1.35rem 0 0; flex-shrink: 0; }
+
+.cb-modal-header {
+  padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+  flex-shrink: 0;
+}
+.cb-modal-logo {
+  width: 3.25rem; height: 3.25rem; border-radius: .9rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; font-weight: 900; color: #fff; overflow: hidden;
+}
+.cb-modal-logo img { width: 100%; height: 100%; object-fit: cover; }
+.cb-modal-name { font-size: 1.1rem; font-weight: 900; color: var(--foreground); letter-spacing: -.02em; margin-bottom: .4rem; }
+.cb-modal-close {
+  width: 2rem; height: 2rem; border-radius: .55rem; background: var(--muted);
+  border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--muted-foreground); flex-shrink: 0; transition: background .15s, color .15s;
+}
+.cb-modal-close:hover { background: var(--accent); color: var(--foreground); }
+.cb-modal-close svg { width: 14px; height: 14px; }
+
+.cb-modal-body { padding: 1.35rem 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+.cb-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
+.cb-info-block {}
+.cb-info-label { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); margin-bottom: .35rem; }
+.cb-info-value { font-size: .875rem; font-weight: 600; color: var(--foreground); }
+.cb-info-value a { color: oklch(0.52 0.2 260); text-decoration: none; }
+.cb-info-value a:hover { text-decoration: underline; }
+
+.cb-section-title { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); margin-bottom: .55rem; }
+.cb-body-text { font-size: .875rem; color: var(--foreground); line-height: 1.7; }
+
+.cb-req-box {
+  background: oklch(0.97 0.015 260 / 0.5); border: 1px solid oklch(0.9 0.04 260);
+  border-radius: .75rem; padding: .9rem 1rem;
+}
+
+.cb-member-box {
+  background: oklch(0.93 0.06 145 / 0.35); border: 1px solid oklch(0.82 0.1 145 / 0.5);
+  border-radius: .75rem; padding: .85rem 1rem;
+  display: flex; align-items: center; gap: .6rem;
+  font-size: .875rem; font-weight: 600; color: oklch(0.35 0.18 145);
+}
+.cb-app-box {
+  border-radius: .75rem; padding: .85rem 1rem;
+  font-size: .875rem; font-weight: 600;
+  display: flex; align-items: center; gap: .5rem;
+}
+
+.cb-modal-apply-btn {
+  width: 100%; padding: .85rem; border-radius: .85rem;
+  background: linear-gradient(135deg, oklch(0.62 0.2 260), oklch(0.5 0.22 265));
+  color: #fff; font-size: .925rem; font-weight: 800; border: none; cursor: pointer;
+  box-shadow: 0 4px 18px oklch(0.58 0.2 260 / 0.38);
+  transition: opacity .2s, transform .15s;
+}
+.cb-modal-apply-btn:hover { opacity: .9; transform: translateY(-1px); }
+
+/* ── Apply form ── */
+.cb-form { display: flex; flex-direction: column; gap: 1.1rem; }
+.cb-form-grid3 { display: grid; grid-template-columns: repeat(3,1fr); gap: .75rem; }
+@media (max-width: 480px) { .cb-form-grid3 { grid-template-columns: 1fr 1fr; } }
+.cb-field { display: flex; flex-direction: column; gap: .32rem; }
+.cb-lbl { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+.cb-lbl-req { color: oklch(0.55 0.22 25); }
+.cb-inp {
+  width: 100%; border: 1.5px solid var(--border); background: var(--background);
+  border-radius: .65rem; padding: .6rem .85rem; font-size: .875rem;
+  color: var(--foreground); outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.cb-inp:focus { border-color: oklch(0.62 0.2 260); box-shadow: 0 0 0 3px oklch(0.62 0.2 260 / 0.12); }
+.cb-inp::placeholder { color: var(--muted-foreground); }
+.cb-sel { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .65rem center; background-size: 1rem; padding-right: 2.5rem; cursor: pointer; }
+.cb-ta { resize: none; }
+
+.cb-apply-err {
+  background: oklch(0.97 0.05 25 / 0.5); border: 1px solid oklch(0.88 0.1 25 / 0.4);
+  border-radius: .65rem; padding: .65rem .9rem;
+  font-size: .82rem; color: oklch(0.5 0.22 25); display: flex; align-items: center; gap: .45rem;
+}
+
+.cb-form-actions { display: flex; gap: .65rem; padding-top: .25rem; }
+.cb-submit-btn {
+  flex: 1; padding: .8rem; border-radius: .8rem;
+  background: linear-gradient(135deg, oklch(0.62 0.2 260), oklch(0.5 0.22 265));
+  color: #fff; font-size: .9rem; font-weight: 800; border: none; cursor: pointer;
+  box-shadow: 0 3px 14px oklch(0.58 0.2 260 / 0.35);
+  transition: opacity .2s; display: flex; align-items: center; justify-content: center; gap: .5rem;
+}
+.cb-submit-btn:hover { opacity: .9; }
+.cb-submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+.cb-cancel-btn {
+  padding: .8rem 1.25rem; border-radius: .8rem;
+  background: transparent; border: 1.5px solid var(--border);
+  color: var(--muted-foreground); font-size: .875rem; font-weight: 600;
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.cb-cancel-btn:hover { background: var(--accent); color: var(--foreground); }
+
+@keyframes cbSpin { to { transform: rotate(360deg); } }
+.cb-spin { animation: cbSpin .8s linear infinite; }
+
+/* ── View Application Modal ── */
+.cb-field-view { display: flex; flex-direction: column; gap: .3rem; }
+.cb-field-view-label { font-size: .67rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); }
+.cb-field-view-value { font-size: .875rem; color: var(--foreground); line-height: 1.65; }
+.cb-field-view-empty { font-size: .82rem; color: var(--muted-foreground); font-style: italic; }
+.cb-modal-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem; }
+@media (max-width: 480px) { .cb-modal-grid3 { grid-template-columns: 1fr 1fr; } }
+
+.cb-btn-edit {
+  flex: 1; padding: .75rem; border-radius: .8rem;
+  background: oklch(0.93 0.05 260 / 0.5); border: 1.5px solid oklch(0.82 0.1 260 / 0.5);
+  color: oklch(0.42 0.2 260); font-size: .875rem; font-weight: 700;
+  cursor: pointer; transition: all .18s;
+  display: flex; align-items: center; justify-content: center; gap: .4rem;
+}
+.cb-btn-edit:hover { background: oklch(0.89 0.08 260 / 0.6); }
+
+.cb-btn-withdraw {
+  padding: .75rem 1.25rem; border-radius: .8rem;
+  background: oklch(0.97 0.05 25 / 0.5); border: 1.5px solid oklch(0.88 0.1 25 / 0.4);
+  color: oklch(0.5 0.22 25); font-size: .875rem; font-weight: 700;
+  cursor: pointer; transition: all .18s;
+  display: flex; align-items: center; justify-content: center; gap: .4rem;
+}
+.cb-btn-withdraw:hover { background: oklch(0.93 0.08 25 / 0.5); }
+
+.cb-confirm-box {
+  background: oklch(0.97 0.05 25 / 0.5); border: 1px solid oklch(0.88 0.1 25 / 0.4);
+  border-radius: .85rem; padding: 1rem 1.1rem;
+}
+.cb-confirm-title { font-size: .9rem; font-weight: 800; color: oklch(0.48 0.22 25); margin-bottom: .35rem; }
+.cb-confirm-text { font-size: .82rem; color: var(--muted-foreground); line-height: 1.55; margin-bottom: .85rem; }
+.cb-confirm-btns { display: flex; gap: .55rem; }
+.cb-btn-confirm-del {
+  flex: 1; padding: .65rem; border-radius: .7rem;
+  background: oklch(0.55 0.22 25); color: #fff;
+  font-size: .82rem; font-weight: 700; border: none; cursor: pointer;
+  transition: opacity .18s;
+}
+.cb-btn-confirm-del:hover { opacity: .85; }
+.cb-btn-confirm-del:disabled { opacity: .5; cursor: not-allowed; }
+.cb-btn-confirm-cancel {
+  padding: .65rem 1rem; border-radius: .7rem;
+  background: transparent; border: 1.5px solid var(--border);
+  color: var(--muted-foreground); font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.cb-btn-confirm-cancel:hover { background: var(--accent); color: var(--foreground); }
+
+/* Clickable status badge (card footer) */
+.cb-status-badge-btn {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .35rem .8rem; border-radius: 999px;
+  font-size: .75rem; font-weight: 700; border: 1px solid transparent;
+  cursor: pointer; transition: opacity .18s, transform .15s; background: none;
+}
+.cb-status-badge-btn:hover { opacity: .78; transform: translateY(-1px); }
+
+/* View-app loading skeleton */
+.cb-view-loading { display: flex; flex-direction: column; gap: .85rem; padding: .5rem 0; }
+.cb-view-skel { border-radius: .55rem; background: var(--muted); animation: cbSkel 1.4s ease-in-out infinite; }
+`
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function ClubsPage() {
-  const [clubs, setClubs] = useState<Club[]>([])
-  const [loading, setLoading] = useState(true)
+  const [clubs, setClubs]       = useState<Club[]>([])
+  const [loading, setLoading]   = useState(true)
   const [category, setCategory] = useState("ALL")
-  const [search, setSearch] = useState("")
+  const [search, setSearch]     = useState("")
 
-  // Apply modal
   const [applyClub, setApplyClub] = useState<Club | null>(null)
   const [applyForm, setApplyForm] = useState({
-    motivation: "",
-    currentYear: "",
-    currentSemester: "",
-    gpa: "",
-    contribution: "",
-    experience: "",
-    availableDays: "",
+    motivation: "", currentYear: "", currentSemester: "",
+    gpa: "", contribution: "", experience: "", availableDays: "",
   })
   const [applyError, setApplyError] = useState("")
-  const [applying, setApplying] = useState(false)
-
-  // Detail modal
+  const [applying, setApplying]     = useState(false)
   const [detailClub, setDetailClub] = useState<Club | null>(null)
+
+  // View / Edit / Delete application
+  const [viewApp, setViewApp]           = useState<FullApplication | null>(null)
+  const [viewLoading, setViewLoading]   = useState(false)
+  const [editMode, setEditMode]         = useState(false)
+  const [editForm, setEditForm]         = useState({ motivation: "", currentYear: "", currentSemester: "", gpa: "", contribution: "", experience: "", availableDays: "" })
+  const [editError, setEditError]       = useState("")
+  const [saving, setSaving]             = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting]         = useState(false)
 
   async function load() {
     setLoading(true)
@@ -85,17 +462,17 @@ export default function ClubsPage() {
     if (res.ok) setClubs(await res.json())
     setLoading(false)
   }
-
   useEffect(() => { load() }, [])
 
-  const filtered = useMemo(() => {
-    return clubs
+  const filtered = useMemo(() =>
+    clubs
       .filter((c) => category === "ALL" || c.category === category)
       .filter((c) => {
         const q = search.toLowerCase()
         return !q || c.name.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q)
-      })
-  }, [clubs, category, search])
+      }),
+    [clubs, category, search]
+  )
 
   function userApplicationStatus(club: Club): string | null {
     if (club.members.some((m) => m.isActive)) return "MEMBER"
@@ -105,365 +482,707 @@ export default function ClubsPage() {
   async function submitApplication() {
     if (!applyClub) return
     if (!applyForm.motivation.trim()) { setApplyError("Motivation is required."); return }
-    setApplying(true)
-    setApplyError("")
+    setApplying(true); setApplyError("")
     const res = await fetch(`/api/clubs/${applyClub.id}/apply`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(applyForm),
     })
     const data = await res.json()
     if (!res.ok) { setApplyError(data.error ?? "Failed to apply."); setApplying(false); return }
-    // Update local state: add application to the club
-    setClubs((prev) =>
-      prev.map((c) =>
-        c.id === applyClub.id
-          ? { ...c, applications: [{ id: data.id, status: "PENDING" }] }
-          : c
-      )
-    )
+    setClubs((prev) => prev.map((c) => c.id === applyClub.id ? { ...c, applications: [{ id: data.id, status: "PENDING" }] } : c))
     setApplyClub(null)
     setApplyForm({ motivation: "", currentYear: "", currentSemester: "", gpa: "", contribution: "", experience: "", availableDays: "" })
     setApplying(false)
   }
 
+  async function openViewApp(appId: number) {
+    setViewLoading(true)
+    setViewApp(null)
+    setEditMode(false)
+    setDeleteConfirm(false)
+    setEditError("")
+    const res = await fetch(`/api/clubs/applications/${appId}`)
+    if (res.ok) {
+      const data: FullApplication = await res.json()
+      setViewApp(data)
+      setEditForm({
+        motivation:      data.motivation ?? "",
+        currentYear:     data.currentYear      ? String(data.currentYear)      : "",
+        currentSemester: data.currentSemester  ? String(data.currentSemester)  : "",
+        gpa:             data.gpa              ? String(data.gpa)              : "",
+        contribution:    data.contribution  ?? "",
+        experience:      data.experience    ?? "",
+        availableDays:   data.availableDays ?? "",
+      })
+    }
+    setViewLoading(false)
+  }
+
+  async function saveEdit() {
+    if (!viewApp) return
+    if (!editForm.motivation.trim()) { setEditError("Motivation is required."); return }
+    setSaving(true); setEditError("")
+    const res = await fetch(`/api/clubs/applications/${viewApp.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    })
+    const data = await res.json()
+    if (!res.ok) { setEditError(data.error ?? "Failed to save."); setSaving(false); return }
+    setViewApp(data as FullApplication)
+    setEditMode(false)
+    setSaving(false)
+  }
+
+  async function withdrawApp() {
+    if (!viewApp) return
+    setDeleting(true)
+    const res = await fetch(`/api/clubs/applications/${viewApp.id}`, { method: "DELETE" })
+    if (res.ok) {
+      setClubs((prev) => prev.map((c) => c.id === viewApp.clubId ? { ...c, applications: [] } : c))
+      setViewApp(null)
+      setDeleteConfirm(false)
+    }
+    setDeleting(false)
+  }
+
+  function closeViewApp() {
+    setViewApp(null)
+    setViewLoading(false)
+    setEditMode(false)
+    setDeleteConfirm(false)
+    setEditError("")
+  }
+
+  const openCount   = clubs.filter((c) => c.status === "OPEN").length
+  const memberCount = clubs.filter((c) => c.members.some((m) => m.isActive)).length
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Clubs & Societies</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Browse and apply to clubs across all categories.
-        </p>
-      </div>
+    <>
+      <style>{CSS}</style>
+      <div style={{ maxWidth: 1080, margin: "0 auto" }}>
 
-      {/* Search + filter bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
-          <input
-            placeholder="Search clubs…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-          />
+        {/* ── Hero ── */}
+        <div className="cb-hero">
+          <div className="cb-hero-glow-a" />
+          <div className="cb-hero-glow-b" />
+          <div className="cb-hero-inner">
+            <div>
+              <div className="cb-hero-tag"><span className="cb-hero-dot" /> Student Clubs</div>
+              <h1 className="cb-hero-title">Clubs & Societies</h1>
+              <p className="cb-hero-sub">
+                Discover and join student clubs across academics, sports, culture and more.
+                Build your society score while making lasting connections.
+              </p>
+            </div>
+            <div className="cb-hero-stats">
+              <div className="cb-hero-stat">
+                <div className="cb-hero-stat-val">{clubs.length}</div>
+                <div className="cb-hero-stat-lbl">Total Clubs</div>
+              </div>
+              <div className="cb-hero-stat">
+                <div className="cb-hero-stat-val">{openCount}</div>
+                <div className="cb-hero-stat-lbl">Open</div>
+              </div>
+              <div className="cb-hero-stat">
+                <div className="cb-hero-stat-val">{memberCount}</div>
+                <div className="cb-hero-stat-lbl">Joined</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Category tabs */}
-      <div className="flex gap-1 flex-wrap">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setCategory(cat)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              category === cat
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-            }`}
-          >
-            {cat === "ALL" ? "All" : cat.charAt(0) + cat.slice(1).toLowerCase()}
-            {cat !== "ALL" && (
-              <span className="ml-1 opacity-60">
-                {clubs.filter((c) => c.category === cat).length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Stats */}
-      <div className="flex gap-4 text-sm text-muted-foreground">
-        <span>{filtered.length} club{filtered.length !== 1 ? "s" : ""}</span>
-        <span>·</span>
-        <span className="text-green-600 dark:text-green-400">
-          {filtered.filter((c) => c.status === "OPEN").length} open
-        </span>
-      </div>
-
-      {/* Club grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-56 rounded-xl bg-muted/50 animate-pulse" />
-          ))}
+        {/* ── Search ── */}
+        <div className="cb-toolbar">
+          <div className="cb-search-wrap">
+            <span className="cb-search-icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+            </span>
+            <input className="cb-search" placeholder="Search clubs by name or description…"
+              value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className="text-4xl mb-3">🏛️</p>
-          <p className="text-base">No clubs found.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((club) => {
-            const appStatus = userApplicationStatus(club)
-            const capacityPct = Math.min((club._count.members / club.capacity) * 100, 100)
 
+        {/* ── Category pills ── */}
+        <div className="cb-cats">
+          {CATEGORIES.map((cat) => {
+            const meta = CAT_META[cat]
+            const count = cat === "ALL" ? clubs.length : clubs.filter((c) => c.category === cat).length
             return (
-              <div
-                key={club.id}
-                className="bg-card border border-border rounded-xl flex flex-col hover:border-primary/40 transition-colors"
-              >
-                {/* Card header */}
-                <div className="p-5 flex-1">
-                  <div className="flex items-start gap-3 mb-3">
-                    {/* Logo / initial */}
-                    <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-lg font-bold text-primary shrink-0">
-                      {club.logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={club.logoUrl} alt={club.name} className="h-full w-full object-cover rounded-xl" />
-                      ) : (
-                        club.name.charAt(0)
-                      )}
+              <button key={cat} className={`cb-cat-btn${category === cat ? " active" : ""}`}
+                onClick={() => setCategory(cat)}>
+                {meta?.icon && <span>{meta.icon}</span>}
+                {cat === "ALL" ? "All" : cap(cat)}
+                {count > 0 && <span className="cb-cat-count">{count}</span>}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── Stats ── */}
+        <div className="cb-stats">
+          <span className="cb-stat-chip"><span className="cb-stat-dot" />{filtered.length} club{filtered.length !== 1 ? "s" : ""}</span>
+          {openCount > 0 && <span className="cb-stat-chip open"><span className="cb-stat-dot" />{openCount} accepting members</span>}
+          {memberCount > 0 && <span className="cb-stat-chip member"><span className="cb-stat-dot" />{memberCount} joined</span>}
+        </div>
+
+        {/* ── Grid ── */}
+        {loading ? (
+          <div className="cb-grid">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="cb-skel" style={{ height: "16rem" }} />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="cb-empty">
+            <div className="cb-empty-icon">🏛️</div>
+            <div className="cb-empty-title">No clubs found.</div>
+            <div className="cb-empty-sub">{search ? "Try a different search term." : "Check back later for new clubs."}</div>
+          </div>
+        ) : (
+          <div className="cb-grid">
+            {filtered.map((club) => {
+              const appStatus  = userApplicationStatus(club)
+              const capPct     = Math.min((club._count.members / club.capacity) * 100, 100)
+              const catMeta    = CAT_META[club.category] ?? CAT_META.OTHER
+              const statMeta   = STATUS_META[club.status] ?? STATUS_META.CLOSED
+              const capColor   = capPct >= 90 ? "oklch(0.55 0.22 25)" : capPct >= 70 ? "oklch(0.6 0.2 55)" : "oklch(0.5 0.2 145)"
+              const heroGrad   = `linear-gradient(135deg, ${catMeta.hero}, oklch(0.38 0.18 265))`
+
+              return (
+                <div key={club.id} className="cb-card">
+                  {/* top accent */}
+                  <div className="cb-card-top" style={{ background: heroGrad }} />
+
+                  <div className="cb-card-body">
+                    {/* Header row */}
+                    <div className="cb-card-header">
+                      <div className="cb-card-logo" style={{ background: heroGrad }}>
+                        {club.logoUrl
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={club.logoUrl} alt={club.name} />
+                          : catMeta.icon}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="cb-card-name">{club.name}</div>
+                        <div className="cb-badges">
+                          <span className="cb-badge" style={{ background: catMeta.bg, color: catMeta.fg }}>
+                            {catMeta.icon} {cap(club.category)}
+                          </span>
+                          <span className="cb-badge" style={{ background: statMeta.bg, color: statMeta.fg }}>
+                            <span className="cb-status-dot" style={{ background: statMeta.dot }} />
+                            {statMeta.label}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground text-sm leading-tight">{club.name}</h3>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLOR[club.category] ?? CATEGORY_COLOR.OTHER}`}>
-                          {club.category.charAt(0) + club.category.slice(1).toLowerCase()}
+
+                    {/* Description */}
+                    <p className="cb-desc">{club.description}</p>
+
+                    {/* Capacity */}
+                    <div>
+                      <div className="cb-cap-row">
+                        <span className="cb-cap-label">Members</span>
+                        <span className="cb-cap-val">{club._count.members} / {club.capacity}</span>
+                      </div>
+                      <div className="cb-cap-track">
+                        <div className="cb-cap-fill" style={{ width: `${capPct}%`, background: capColor }} />
+                      </div>
+                    </div>
+
+                    {/* Email */}
+                    {club.email && (
+                      <div className="cb-card-email">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                        </svg>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{club.email}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="cb-card-footer">
+                    <button className="cb-details-btn" onClick={() => setDetailClub(club)}>
+                      View details
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+
+                    {appStatus === "MEMBER" ? (
+                      <span className="cb-member-badge">✓ Member</span>
+                    ) : appStatus ? (
+                      <button className="cb-status-badge-btn"
+                        style={{ background: APP_META[appStatus]?.bg, color: APP_META[appStatus]?.fg }}
+                        onClick={() => openViewApp(club.applications[0].id)}
+                        title="View your application">
+                        {APP_META[appStatus]?.label ?? appStatus} →
+                      </button>
+                    ) : club.status === "OPEN" ? (
+                      <button className="cb-apply-btn" onClick={() => { setApplyClub(club); setApplyError("") }}>
+                        Apply →
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: ".75rem", color: "var(--muted-foreground)" }}>Closed</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── Detail Modal ── */}
+        {detailClub && (() => {
+          const catMeta  = CAT_META[detailClub.category] ?? CAT_META.OTHER
+          const statMeta = STATUS_META[detailClub.status] ?? STATUS_META.CLOSED
+          const heroGrad = `linear-gradient(135deg, ${catMeta.hero}, oklch(0.38 0.18 265))`
+          const appStatus = userApplicationStatus(detailClub)
+          const capPct   = Math.min((detailClub._count.members / detailClub.capacity) * 100, 100)
+          const capColor = capPct >= 90 ? "oklch(0.55 0.22 25)" : capPct >= 70 ? "oklch(0.6 0.2 55)" : "oklch(0.5 0.2 145)"
+
+          return (
+            <div className="cb-backdrop" onClick={() => setDetailClub(null)}>
+              <div className="cb-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="cb-modal-top" style={{ background: heroGrad }} />
+
+                <div className="cb-modal-header">
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: ".85rem", flex: 1, minWidth: 0 }}>
+                    <div className="cb-modal-logo" style={{ background: heroGrad }}>
+                      {detailClub.logoUrl
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={detailClub.logoUrl} alt={detailClub.name} />
+                        : catMeta.icon}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="cb-modal-name">{detailClub.name}</div>
+                      <div className="cb-badges">
+                        <span className="cb-badge" style={{ background: catMeta.bg, color: catMeta.fg }}>
+                          {catMeta.icon} {cap(detailClub.category)}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[club.status]}`}>
-                          {club.status.charAt(0) + club.status.slice(1).toLowerCase()}
+                        <span className="cb-badge" style={{ background: statMeta.bg, color: statMeta.fg }}>
+                          <span className="cb-status-dot" style={{ background: statMeta.dot }} />
+                          {statMeta.label}
                         </span>
                       </div>
                     </div>
                   </div>
-
-                  {/* Description */}
-                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-3">
-                    {club.description}
-                  </p>
-
-                  {/* Capacity bar */}
-                  <div className="mb-3">
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Members</span>
-                      <span className="font-medium text-foreground">{club._count.members} / {club.capacity}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${capacityPct}%`,
-                          backgroundColor: capacityPct >= 90 ? "#ef4444" : capacityPct >= 70 ? "#f59e0b" : "#22c55e",
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {club.email && (
-                    <p className="text-xs text-muted-foreground truncate">{club.email}</p>
-                  )}
-                </div>
-
-                {/* Card footer */}
-                <div className="px-5 py-3 border-t border-border flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => setDetailClub(club)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    View details
+                  <button className="cb-modal-close" onClick={() => setDetailClub(null)}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
                   </button>
-
-                  {appStatus === "MEMBER" ? (
-                    <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium">
-                      ✓ Member
-                    </span>
-                  ) : appStatus ? (
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${APPLICATION_STYLE[appStatus]}`}>
-                      {appStatus.charAt(0) + appStatus.slice(1).toLowerCase()}
-                    </span>
-                  ) : club.status === "OPEN" ? (
-                    <button
-                      onClick={() => { setApplyClub(club); setApplyError("") }}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
-                    >
-                      Apply
-                    </button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Closed</span>
-                  )}
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
 
-      {/* ── Detail Modal ──────────────────────────────────────────────────────── */}
-      {detailClub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setDetailClub(null)}>
-          <div className="bg-card border border-border rounded-xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between p-5 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-lg font-bold text-primary shrink-0">
-                  {detailClub.name.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">{detailClub.name}</h3>
-                  <div className="flex gap-1.5 mt-1">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLOR[detailClub.category] ?? CATEGORY_COLOR.OTHER}`}>
-                      {detailClub.category.charAt(0) + detailClub.category.slice(1).toLowerCase()}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[detailClub.status]}`}>
-                      {detailClub.status.charAt(0) + detailClub.status.slice(1).toLowerCase()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setDetailClub(null)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">About</p>
-                <p className="text-sm text-foreground leading-relaxed">{detailClub.description}</p>
-              </div>
-
-              {detailClub.requirements && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Requirements</p>
-                  <p className="text-sm text-foreground leading-relaxed">{detailClub.requirements}</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Capacity</p>
-                  <p className="font-medium text-foreground">{detailClub._count.members} / {detailClub.capacity} members</p>
-                </div>
-                {detailClub.email && (
+                <div className="cb-modal-body">
+                  {/* About */}
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Email</p>
-                    <a href={`mailto:${detailClub.email}`} className="text-primary hover:underline text-sm break-all">{detailClub.email}</a>
+                    <div className="cb-section-title">About</div>
+                    <p className="cb-body-text">{detailClub.description}</p>
                   </div>
-                )}
-              </div>
 
-              {(() => {
-                const appStatus = userApplicationStatus(detailClub)
-                if (appStatus === "MEMBER") return (
-                  <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 text-sm text-green-700 dark:text-green-400">
-                    ✓ You are a member of this club.
+                  {/* Requirements */}
+                  {detailClub.requirements && (
+                    <div>
+                      <div className="cb-section-title">Requirements</div>
+                      <div className="cb-req-box">
+                        <p className="cb-body-text" style={{ fontSize: ".82rem" }}>{detailClub.requirements}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stats grid */}
+                  <div className="cb-info-grid">
+                    <div className="cb-info-block">
+                      <div className="cb-info-label">Capacity</div>
+                      <div className="cb-info-value">{detailClub._count.members} / {detailClub.capacity} members</div>
+                      <div style={{ marginTop: ".5rem" }}>
+                        <div className="cb-cap-track">
+                          <div className="cb-cap-fill" style={{ width: `${capPct}%`, background: capColor }} />
+                        </div>
+                      </div>
+                    </div>
+                    {detailClub.email && (
+                      <div className="cb-info-block">
+                        <div className="cb-info-label">Contact</div>
+                        <div className="cb-info-value">
+                          <a href={`mailto:${detailClub.email}`}>{detailClub.email}</a>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )
-                if (appStatus) return (
-                  <div className={`p-3 rounded-lg border text-sm ${APPLICATION_STYLE[appStatus]} bg-opacity-20`}>
-                    Application status: <strong>{appStatus.charAt(0) + appStatus.slice(1).toLowerCase()}</strong>
+
+                  {/* Action */}
+                  {appStatus === "MEMBER" ? (
+                    <div className="cb-member-box">
+                      <span>✓</span> You are a member of this club.
+                    </div>
+                  ) : appStatus ? (
+                    <button className="cb-modal-apply-btn"
+                      style={{ background: APP_META[appStatus]?.bg ?? "var(--muted)", color: APP_META[appStatus]?.fg ?? "var(--foreground)", boxShadow: "none", border: "1.5px solid transparent" }}
+                      onClick={() => { setDetailClub(null); openViewApp(detailClub.applications[0].id) }}>
+                      📋 View My Application ({APP_META[appStatus]?.label ?? appStatus}) →
+                    </button>
+                  ) : detailClub.status === "OPEN" ? (
+                    <button className="cb-modal-apply-btn"
+                      onClick={() => { setDetailClub(null); setApplyClub(detailClub); setApplyError("") }}>
+                      Apply to Join →
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* ── Apply Modal ── */}
+        {applyClub && (() => {
+          const catMeta  = CAT_META[applyClub.category] ?? CAT_META.OTHER
+          const heroGrad = `linear-gradient(135deg, ${catMeta.hero}, oklch(0.38 0.18 265))`
+          return (
+            <div className="cb-backdrop" onClick={() => setApplyClub(null)}>
+              <div className="cb-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="cb-modal-top" style={{ background: heroGrad }} />
+
+                <div className="cb-modal-header">
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: ".85rem", flex: 1, minWidth: 0 }}>
+                    <div className="cb-modal-logo" style={{ background: heroGrad }}>{catMeta.icon}</div>
+                    <div>
+                      <div className="cb-modal-name">Apply — {applyClub.name}</div>
+                      <div style={{ fontSize: ".78rem", color: "var(--muted-foreground)", marginTop: ".2rem" }}>
+                        Fill in the form to submit your application.
+                      </div>
+                    </div>
                   </div>
-                )
-                if (detailClub.status === "OPEN") return (
-                  <button
-                    onClick={() => { setDetailClub(null); setApplyClub(detailClub); setApplyError("") }}
-                    className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-                  >
-                    Apply to Join
+                  <button className="cb-modal-close" onClick={() => setApplyClub(null)}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
                   </button>
-                )
-                return null
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Apply Modal ───────────────────────────────────────────────────────── */}
-      {applyClub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setApplyClub(null)}>
-          <div className="bg-card border border-border rounded-xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <div>
-                <h3 className="font-semibold text-foreground">Apply to {applyClub.name}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Fill in the form to submit your application.</p>
-              </div>
-              <button onClick={() => setApplyClub(null)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {applyError && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2.5 text-sm text-destructive">
-                  {applyError}
                 </div>
-              )}
 
-              {/* Academic info */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Year</label>
-                  <select value={applyForm.currentYear} onChange={(e) => setApplyForm((p) => ({ ...p, currentYear: e.target.value }))} className={INPUT}>
-                    <option value="">—</option>
-                    {[1, 2, 3, 4].map((y) => <option key={y} value={y}>Year {y}</option>)}
-                  </select>
+                <div className="cb-modal-body">
+                  {applyError && (
+                    <div className="cb-apply-err">
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      {applyError}
+                    </div>
+                  )}
+
+                  <div className="cb-form">
+                    {/* Academic info */}
+                    <div className="cb-form-grid3">
+                      <div className="cb-field">
+                        <label className="cb-lbl">Year</label>
+                        <select className="cb-inp cb-sel" value={applyForm.currentYear}
+                          onChange={(e) => setApplyForm((p) => ({ ...p, currentYear: e.target.value }))}>
+                          <option value="">—</option>
+                          {[1,2,3,4].map((y) => <option key={y} value={y}>Year {y}</option>)}
+                        </select>
+                      </div>
+                      <div className="cb-field">
+                        <label className="cb-lbl">Semester</label>
+                        <select className="cb-inp cb-sel" value={applyForm.currentSemester}
+                          onChange={(e) => setApplyForm((p) => ({ ...p, currentSemester: e.target.value }))}>
+                          <option value="">—</option>
+                          {[1,2].map((s) => <option key={s} value={s}>Sem {s}</option>)}
+                        </select>
+                      </div>
+                      <div className="cb-field">
+                        <label className="cb-lbl">GPA</label>
+                        <input className="cb-inp" type="number" step=".01" min="0" max="4"
+                          placeholder="3.50" value={applyForm.gpa}
+                          onChange={(e) => setApplyForm((p) => ({ ...p, gpa: e.target.value }))} />
+                      </div>
+                    </div>
+
+                    {/* Motivation */}
+                    <div className="cb-field">
+                      <label className="cb-lbl">Why do you want to join? <span className="cb-lbl-req">*</span></label>
+                      <textarea className="cb-inp cb-ta" rows={4}
+                        placeholder="Share your motivation for joining this club…"
+                        value={applyForm.motivation}
+                        onChange={(e) => setApplyForm((p) => ({ ...p, motivation: e.target.value }))} />
+                    </div>
+
+                    {/* Contribution */}
+                    <div className="cb-field">
+                      <label className="cb-lbl">What can you contribute? <span style={{ fontWeight: 400, opacity: .6, textTransform: "none" }}>(optional)</span></label>
+                      <textarea className="cb-inp cb-ta" rows={2}
+                        placeholder="Skills, time, ideas…"
+                        value={applyForm.contribution}
+                        onChange={(e) => setApplyForm((p) => ({ ...p, contribution: e.target.value }))} />
+                    </div>
+
+                    {/* Experience */}
+                    <div className="cb-field">
+                      <label className="cb-lbl">Relevant experience <span style={{ fontWeight: 400, opacity: .6, textTransform: "none" }}>(optional)</span></label>
+                      <textarea className="cb-inp cb-ta" rows={2}
+                        placeholder="Previous club memberships, competitions…"
+                        value={applyForm.experience}
+                        onChange={(e) => setApplyForm((p) => ({ ...p, experience: e.target.value }))} />
+                    </div>
+
+                    {/* Available days */}
+                    <div className="cb-field">
+                      <label className="cb-lbl">Available days <span style={{ fontWeight: 400, opacity: .6, textTransform: "none" }}>(optional)</span></label>
+                      <input className="cb-inp" placeholder="e.g. Monday, Wednesday, Friday"
+                        value={applyForm.availableDays}
+                        onChange={(e) => setApplyForm((p) => ({ ...p, availableDays: e.target.value }))} />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="cb-form-actions">
+                      <button className="cb-submit-btn" onClick={submitApplication} disabled={applying}>
+                        {applying ? (
+                          <>
+                            <svg className="cb-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                            </svg>
+                            Submitting…
+                          </>
+                        ) : "Submit Application →"}
+                      </button>
+                      <button className="cb-cancel-btn" onClick={() => setApplyClub(null)}>Cancel</button>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Semester</label>
-                  <select value={applyForm.currentSemester} onChange={(e) => setApplyForm((p) => ({ ...p, currentSemester: e.target.value }))} className={INPUT}>
-                    <option value="">—</option>
-                    {[1, 2].map((s) => <option key={s} value={s}>Sem {s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">GPA</label>
-                  <input type="number" step="0.01" min="0" max="4" placeholder="3.50" value={applyForm.gpa} onChange={(e) => setApplyForm((p) => ({ ...p, gpa: e.target.value }))} className={INPUT} />
-                </div>
-              </div>
-
-              {/* Motivation */}
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">
-                  Why do you want to join? <span className="text-destructive">*</span>
-                </label>
-                <textarea
-                  rows={4}
-                  placeholder="Tell us your motivation for joining this club…"
-                  value={applyForm.motivation}
-                  onChange={(e) => setApplyForm((p) => ({ ...p, motivation: e.target.value }))}
-                  className={TEXTAREA}
-                />
-              </div>
-
-              {/* Contribution */}
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">What can you contribute? <span className="text-xs opacity-60">(optional)</span></label>
-                <textarea rows={3} placeholder="Skills, time, ideas…" value={applyForm.contribution} onChange={(e) => setApplyForm((p) => ({ ...p, contribution: e.target.value }))} className={TEXTAREA} />
-              </div>
-
-              {/* Experience */}
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Relevant experience <span className="text-xs opacity-60">(optional)</span></label>
-                <textarea rows={2} placeholder="Previous club memberships, competitions…" value={applyForm.experience} onChange={(e) => setApplyForm((p) => ({ ...p, experience: e.target.value }))} className={TEXTAREA} />
-              </div>
-
-              {/* Available days */}
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Available days <span className="text-xs opacity-60">(optional)</span></label>
-                <input placeholder="e.g. Monday, Wednesday, Friday" value={applyForm.availableDays} onChange={(e) => setApplyForm((p) => ({ ...p, availableDays: e.target.value }))} className={INPUT} />
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <button onClick={submitApplication} disabled={applying}
-                  className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-60 transition-opacity">
-                  {applying ? "Submitting…" : "Submit Application"}
-                </button>
-                <button onClick={() => setApplyClub(null)}
-                  className="px-5 py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-accent">
-                  Cancel
-                </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          )
+        })()}
+
+        {/* ── View / Edit / Delete Application Modal ── */}
+        {(viewApp || viewLoading) && (() => {
+          const catMeta  = viewApp ? (CAT_META[viewApp.club.category] ?? CAT_META.OTHER) : CAT_META.OTHER
+          const heroGrad = `linear-gradient(135deg, ${catMeta.hero}, oklch(0.38 0.18 265))`
+          return (
+            <div className="cb-backdrop" onClick={closeViewApp}>
+              <div className="cb-modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+                <div className="cb-modal-top" style={{ background: heroGrad }} />
+
+                <div className="cb-modal-header">
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: ".85rem", flex: 1, minWidth: 0 }}>
+                    <div className="cb-modal-logo" style={{ background: heroGrad }}>
+                      {catMeta.icon}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="cb-modal-name">{editMode ? "Edit Application" : "My Application"}</div>
+                      {viewApp && (
+                        <div style={{ fontSize: ".78rem", color: "var(--muted-foreground)", marginTop: ".2rem" }}>
+                          {viewApp.club.name}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button className="cb-modal-close" onClick={closeViewApp}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="cb-modal-body">
+                  {viewLoading ? (
+                    <div className="cb-view-loading">
+                      <div className="cb-view-skel" style={{ height: "1.5rem", width: "40%" }} />
+                      <div className="cb-view-skel" style={{ height: "4rem" }} />
+                      <div className="cb-view-skel" style={{ height: "3rem" }} />
+                      <div className="cb-view-skel" style={{ height: "3rem" }} />
+                    </div>
+                  ) : viewApp ? editMode ? (
+
+                    // ── Edit form ─────────────────────────────────────────────
+                    <div className="cb-form">
+                      {editError && (
+                        <div className="cb-apply-err">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                          </svg>
+                          {editError}
+                        </div>
+                      )}
+
+                      <div className="cb-form-grid3">
+                        <div className="cb-field">
+                          <label className="cb-lbl">Year</label>
+                          <select className="cb-inp cb-sel" value={editForm.currentYear}
+                            onChange={(e) => setEditForm((p) => ({ ...p, currentYear: e.target.value }))}>
+                            <option value="">—</option>
+                            {[1,2,3,4].map((y) => <option key={y} value={y}>Year {y}</option>)}
+                          </select>
+                        </div>
+                        <div className="cb-field">
+                          <label className="cb-lbl">Semester</label>
+                          <select className="cb-inp cb-sel" value={editForm.currentSemester}
+                            onChange={(e) => setEditForm((p) => ({ ...p, currentSemester: e.target.value }))}>
+                            <option value="">—</option>
+                            {[1,2].map((s) => <option key={s} value={s}>Sem {s}</option>)}
+                          </select>
+                        </div>
+                        <div className="cb-field">
+                          <label className="cb-lbl">GPA</label>
+                          <input className="cb-inp" type="number" step=".01" min="0" max="4"
+                            placeholder="3.50" value={editForm.gpa}
+                            onChange={(e) => setEditForm((p) => ({ ...p, gpa: e.target.value }))} />
+                        </div>
+                      </div>
+
+                      <div className="cb-field">
+                        <label className="cb-lbl">Why do you want to join? <span className="cb-lbl-req">*</span></label>
+                        <textarea className="cb-inp cb-ta" rows={4}
+                          placeholder="Share your motivation…"
+                          value={editForm.motivation}
+                          onChange={(e) => setEditForm((p) => ({ ...p, motivation: e.target.value }))} />
+                      </div>
+
+                      <div className="cb-field">
+                        <label className="cb-lbl">What can you contribute? <span style={{ fontWeight: 400, opacity: .6, textTransform: "none" }}>(optional)</span></label>
+                        <textarea className="cb-inp cb-ta" rows={2}
+                          placeholder="Skills, time, ideas…"
+                          value={editForm.contribution}
+                          onChange={(e) => setEditForm((p) => ({ ...p, contribution: e.target.value }))} />
+                      </div>
+
+                      <div className="cb-field">
+                        <label className="cb-lbl">Relevant experience <span style={{ fontWeight: 400, opacity: .6, textTransform: "none" }}>(optional)</span></label>
+                        <textarea className="cb-inp cb-ta" rows={2}
+                          placeholder="Previous club memberships, competitions…"
+                          value={editForm.experience}
+                          onChange={(e) => setEditForm((p) => ({ ...p, experience: e.target.value }))} />
+                      </div>
+
+                      <div className="cb-field">
+                        <label className="cb-lbl">Available days <span style={{ fontWeight: 400, opacity: .6, textTransform: "none" }}>(optional)</span></label>
+                        <input className="cb-inp" placeholder="e.g. Monday, Wednesday, Friday"
+                          value={editForm.availableDays}
+                          onChange={(e) => setEditForm((p) => ({ ...p, availableDays: e.target.value }))} />
+                      </div>
+
+                      <div className="cb-form-actions">
+                        <button className="cb-submit-btn" onClick={saveEdit} disabled={saving}>
+                          {saving ? (
+                            <>
+                              <svg className="cb-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                              </svg>
+                              Saving…
+                            </>
+                          ) : "Save Changes →"}
+                        </button>
+                        <button className="cb-cancel-btn" onClick={() => { setEditMode(false); setEditError("") }}>Cancel</button>
+                      </div>
+                    </div>
+
+                  ) : (
+
+                    // ── Read-only view ────────────────────────────────────────
+                    <>
+                      {/* Status + date */}
+                      <div style={{ display: "flex", gap: ".65rem", alignItems: "center", flexWrap: "wrap" }}>
+                        <span className="cb-badge"
+                          style={{ background: APP_META[viewApp.status]?.bg, color: APP_META[viewApp.status]?.fg, padding: ".28rem .75rem" }}>
+                          {APP_META[viewApp.status]?.label ?? viewApp.status}
+                        </span>
+                        <span style={{ fontSize: ".75rem", color: "var(--muted-foreground)" }}>
+                          Submitted {new Date(viewApp.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                        </span>
+                      </div>
+
+                      {/* Academic info */}
+                      <div className="cb-modal-grid3">
+                        <div className="cb-field-view">
+                          <div className="cb-field-view-label">Year</div>
+                          <div className={viewApp.currentYear ? "cb-field-view-value" : "cb-field-view-empty"}>
+                            {viewApp.currentYear ? `Year ${viewApp.currentYear}` : "Not provided"}
+                          </div>
+                        </div>
+                        <div className="cb-field-view">
+                          <div className="cb-field-view-label">Semester</div>
+                          <div className={viewApp.currentSemester ? "cb-field-view-value" : "cb-field-view-empty"}>
+                            {viewApp.currentSemester ? `Semester ${viewApp.currentSemester}` : "Not provided"}
+                          </div>
+                        </div>
+                        <div className="cb-field-view">
+                          <div className="cb-field-view-label">GPA</div>
+                          <div className={viewApp.gpa ? "cb-field-view-value" : "cb-field-view-empty"}>
+                            {viewApp.gpa ? Number(viewApp.gpa).toFixed(2) : "Not provided"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Motivation */}
+                      <div className="cb-field-view">
+                        <div className="cb-field-view-label">Why do you want to join?</div>
+                        <div className="cb-field-view-value">{viewApp.motivation}</div>
+                      </div>
+
+                      {/* Contribution */}
+                      {viewApp.contribution && (
+                        <div className="cb-field-view">
+                          <div className="cb-field-view-label">What can you contribute?</div>
+                          <div className="cb-field-view-value">{viewApp.contribution}</div>
+                        </div>
+                      )}
+
+                      {/* Experience */}
+                      {viewApp.experience && (
+                        <div className="cb-field-view">
+                          <div className="cb-field-view-label">Relevant Experience</div>
+                          <div className="cb-field-view-value">{viewApp.experience}</div>
+                        </div>
+                      )}
+
+                      {/* Available days */}
+                      {viewApp.availableDays && (
+                        <div className="cb-field-view">
+                          <div className="cb-field-view-label">Available Days</div>
+                          <div className="cb-field-view-value">{viewApp.availableDays}</div>
+                        </div>
+                      )}
+
+                      {/* Actions (PENDING only) */}
+                      {viewApp.status === "PENDING" && (
+                        deleteConfirm ? (
+                          <div className="cb-confirm-box">
+                            <div className="cb-confirm-title">Withdraw Application?</div>
+                            <div className="cb-confirm-text">
+                              This will permanently delete your application to <strong>{viewApp.club.name}</strong>. You can reapply later if the club is still open.
+                            </div>
+                            <div className="cb-confirm-btns">
+                              <button className="cb-btn-confirm-del" onClick={withdrawApp} disabled={deleting}>
+                                {deleting ? "Withdrawing…" : "Yes, Withdraw"}
+                              </button>
+                              <button className="cb-btn-confirm-cancel" onClick={() => setDeleteConfirm(false)}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="cb-form-actions">
+                            <button className="cb-btn-edit" onClick={() => { setEditMode(true); setEditError("") }}>
+                              ✎ Edit Application
+                            </button>
+                            <button className="cb-btn-withdraw" onClick={() => setDeleteConfirm(true)}>
+                              ✕ Withdraw
+                            </button>
+                          </div>
+                        )
+                      )}
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
+      </div>
+    </>
   )
 }

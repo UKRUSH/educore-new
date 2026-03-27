@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import type { NextRequest } from "next/server"
 import { AchievementType } from "@prisma/client"
 import { getSession } from "@/lib/auth/session"
