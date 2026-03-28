@@ -32,6 +32,7 @@ type MyClub = {
   club: { id: number; name: string; category: string; logoUrl: string | null; _count: { members: number } }
 }
 type AttendanceQR = { token: string; label: string; expiresAt: string; qrDataUrl: string; clubId: number }
+type StudentProfile = { fullName: string; studentId: string }
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -343,6 +344,8 @@ const CSS = `
 }
 .cb-inp:focus { border-color: oklch(0.62 0.2 260); box-shadow: 0 0 0 3px oklch(0.62 0.2 260 / 0.12); }
 .cb-inp::placeholder { color: var(--muted-foreground); }
+.cb-inp-invalid { border-color: oklch(0.6 0.22 25) !important; box-shadow: 0 0 0 3px oklch(0.6 0.22 25 / 0.1) !important; }
+.cb-inp-valid   { border-color: oklch(0.55 0.18 145); }
 .cb-sel { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .65rem center; background-size: 1rem; padding-right: 2.5rem; cursor: pointer; }
 .cb-ta { resize: none; }
 
@@ -540,11 +543,13 @@ export default function ClubsPage() {
   const [category, setCategory] = useState("ALL")
   const [search, setSearch]     = useState("")
 
+  const [studentProfile, setStudentProfile] = useState<StudentProfile>({ fullName: "", studentId: "" })
+
   const [applyClub, setApplyClub] = useState<Club | null>(null)
   const [applyForm, setApplyForm] = useState({
-    motivation: "", currentYear: "", currentSemester: "",
-    gpa: "", contribution: "", experience: "", availableDays: "",
+    motivation: "", contribution: "", experience: "", availableDays: "",
   })
+  const [applyTouched, setApplyTouched] = useState({ motivation: false })
   const [applyError, setApplyError] = useState("")
   const [applying, setApplying]     = useState(false)
   const [detailClub, setDetailClub] = useState<Club | null>(null)
@@ -571,12 +576,17 @@ export default function ClubsPage() {
 
   async function load() {
     setLoading(true)
-    const [clubsRes, myRes] = await Promise.all([
+    const [clubsRes, myRes, meRes] = await Promise.all([
       fetch("/api/clubs"),
       fetch("/api/clubs/my"),
+      fetch("/api/profile/me"),
     ])
     if (clubsRes.ok) setClubs(await clubsRes.json())
     if (myRes.ok) setMyClubs(await myRes.json())
+    if (meRes.ok) {
+      const me: { fullName: string; studentId: string } = await meRes.json()
+      setStudentProfile({ fullName: me.fullName, studentId: me.studentId })
+    }
     setLoading(false)
     setMyClubsLoading(false)
   }
@@ -610,9 +620,24 @@ export default function ClubsPage() {
     return club.applications[0]?.status ?? null
   }
 
+  function openApply(club: Club) {
+    setApplyClub(club)
+    setApplyError("")
+    setApplyTouched({ motivation: false })
+    setApplyForm({ motivation: "", contribution: "", experience: "", availableDays: "" })
+  }
+
+  const motivationErr = applyTouched.motivation && applyForm.motivation.trim().length < 20
+    ? "Please write at least 20 characters."
+    : ""
+
   async function submitApplication() {
     if (!applyClub) return
-    if (!applyForm.motivation.trim()) { setApplyError("Motivation is required."); return }
+    setApplyTouched({ motivation: true })
+    if (!applyForm.motivation.trim() || applyForm.motivation.trim().length < 20) {
+      setApplyError("Please write at least 20 characters in the motivation field.")
+      return
+    }
     setApplying(true); setApplyError("")
     const res = await fetch(`/api/clubs/${applyClub.id}/apply`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -622,7 +647,8 @@ export default function ClubsPage() {
     if (!res.ok) { setApplyError(data.error ?? "Failed to apply."); setApplying(false); return }
     setClubs((prev) => prev.map((c) => c.id === applyClub.id ? { ...c, applications: [{ id: data.id, status: "PENDING" }] } : c))
     setApplyClub(null)
-    setApplyForm({ motivation: "", currentYear: "", currentSemester: "", gpa: "", contribution: "", experience: "", availableDays: "" })
+    setApplyForm({ motivation: "", contribution: "", experience: "", availableDays: "" })
+    setApplyTouched({ motivation: false })
     setApplying(false)
   }
 
@@ -918,7 +944,7 @@ export default function ClubsPage() {
                         {APP_META[appStatus]?.label ?? appStatus} →
                       </button>
                     ) : club.status === "OPEN" ? (
-                      <button className="cb-apply-btn" onClick={() => { setApplyClub(club); setApplyError("") }}>
+                      <button className="cb-apply-btn" onClick={() => openApply(club)}>
                         Apply →
                       </button>
                     ) : (
@@ -1024,7 +1050,7 @@ export default function ClubsPage() {
                     </button>
                   ) : detailClub.status === "OPEN" ? (
                     <button className="cb-modal-apply-btn"
-                      onClick={() => { setDetailClub(null); setApplyClub(detailClub); setApplyError("") }}>
+                      onClick={() => { setDetailClub(null); openApply(detailClub) }}>
                       Apply to Join →
                     </button>
                   ) : null}
@@ -1053,7 +1079,7 @@ export default function ClubsPage() {
                       </div>
                     </div>
                   </div>
-                  <button className="cb-modal-close" onClick={() => setApplyClub(null)}>
+                  <button className="cb-modal-close" onClick={() => { setApplyClub(null); setApplyTouched({ motivation: false }) }}>
                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                     </svg>
@@ -1071,39 +1097,40 @@ export default function ClubsPage() {
                   )}
 
                   <div className="cb-form">
-                    {/* Academic info */}
-                    <div className="cb-form-grid3">
+                    {/* Applicant identity — auto-filled */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".75rem" }}>
                       <div className="cb-field">
-                        <label className="cb-lbl">Year</label>
-                        <select className="cb-inp cb-sel" value={applyForm.currentYear}
-                          onChange={(e) => setApplyForm((p) => ({ ...p, currentYear: e.target.value }))}>
-                          <option value="">—</option>
-                          {[1,2,3,4].map((y) => <option key={y} value={y}>Year {y}</option>)}
-                        </select>
+                        <label className="cb-lbl">Index Number</label>
+                        <div className="cb-inp" style={{ background: "var(--muted)", color: "var(--foreground)", fontWeight: 700, cursor: "default", userSelect: "none" }}>
+                          {studentProfile.studentId || "—"}
+                        </div>
                       </div>
                       <div className="cb-field">
-                        <label className="cb-lbl">Semester</label>
-                        <select className="cb-inp cb-sel" value={applyForm.currentSemester}
-                          onChange={(e) => setApplyForm((p) => ({ ...p, currentSemester: e.target.value }))}>
-                          <option value="">—</option>
-                          {[1,2].map((s) => <option key={s} value={s}>Sem {s}</option>)}
-                        </select>
-                      </div>
-                      <div className="cb-field">
-                        <label className="cb-lbl">GPA</label>
-                        <input className="cb-inp" type="number" step=".01" min="0" max="4"
-                          placeholder="3.50" value={applyForm.gpa}
-                          onChange={(e) => setApplyForm((p) => ({ ...p, gpa: e.target.value }))} />
+                        <label className="cb-lbl">Full Name</label>
+                        <div className="cb-inp" style={{ background: "var(--muted)", color: "var(--foreground)", fontWeight: 600, cursor: "default", userSelect: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {studentProfile.fullName || "—"}
+                        </div>
                       </div>
                     </div>
 
                     {/* Motivation */}
                     <div className="cb-field">
                       <label className="cb-lbl">Why do you want to join? <span className="cb-lbl-req">*</span></label>
-                      <textarea className="cb-inp cb-ta" rows={4}
+                      <textarea
+                        className={`cb-inp cb-ta${motivationErr ? " cb-inp-invalid" : applyTouched.motivation && applyForm.motivation.trim().length >= 20 ? " cb-inp-valid" : ""}`}
+                        rows={4}
                         placeholder="Share your motivation for joining this club…"
                         value={applyForm.motivation}
-                        onChange={(e) => setApplyForm((p) => ({ ...p, motivation: e.target.value }))} />
+                        onChange={(e) => { setApplyForm((p) => ({ ...p, motivation: e.target.value })); setApplyError("") }}
+                        onBlur={() => setApplyTouched((p) => ({ ...p, motivation: true }))} />
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: ".2rem" }}>
+                        {motivationErr
+                          ? <span style={{ fontSize: ".72rem", color: "oklch(0.5 0.22 25)" }}>{motivationErr}</span>
+                          : <span />}
+                        <span style={{ fontSize: ".7rem", color: applyForm.motivation.trim().length >= 20 ? "oklch(0.45 0.18 145)" : "var(--muted-foreground)" }}>
+                          {applyForm.motivation.trim().length} / 20 min
+                        </span>
+                      </div>
                     </div>
 
                     {/* Contribution */}

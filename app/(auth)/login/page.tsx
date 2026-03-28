@@ -87,20 +87,19 @@ body { overflow: hidden; cursor: none; }
 
 /* ── Logo (top-left) ── */
 .lc-logo {
-  position: absolute; top: 2rem; left: 2.5rem; z-index: 20;
-  display: flex; align-items: center; gap: .5rem; text-decoration: none;
+  position: absolute; top: 1.75rem; left: 2rem; z-index: 20;
+  display: flex; align-items: center; gap: .7rem; text-decoration: none;
 }
-.lc-logo-icon {
-  width: 32px; height: 32px; border-radius: 8px;
-  background: linear-gradient(135deg, oklch(0.6231 0.1880 259.8145), oklch(0.4882 0.2172 264.3763));
-  display: flex; align-items: center; justify-content: center;
-  font-size: .8rem; font-weight: 800; color: white;
-  box-shadow: 0 4px 16px oklch(0.6231 0.1880 259.8145 / .4);
+.lc-logo-box {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25); overflow: hidden;
 }
+.lc-logo-box img { width: 40px; height: 40px; object-fit: contain; }
 .lc-logo-name {
-  font-size: 1.15rem; font-weight: 800; color: white;
-  letter-spacing: -.03em;
+  font-size: 1.05rem; font-weight: 900; letter-spacing: -.04em; color: #fff; line-height: 1;
 }
+.lc-logo-name em { font-style: normal; opacity: .7; font-weight: 600; }
 .lc-live {
   position: absolute; top: 2.1rem; right: 2.5rem; z-index: 20;
   display: flex; align-items: center; gap: .4rem;
@@ -452,7 +451,11 @@ export default function LoginPage() {
 
       {/* Logo */}
       <a href="/" className="lc-logo">
-        <img src="/logo2.png" alt="EduCore" style={{ height: "36px", width: "auto", objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+        <div className="lc-logo-box">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo_icon.png" alt="EduCore" />
+        </div>
+        <span className="lc-logo-name">Edu<em>Core</em></span>
       </a>
 
       {/* Live badge */}

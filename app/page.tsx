@@ -60,10 +60,19 @@ body {
   border-bottom: 1px solid var(--border-s);
 }
 .nav-logo {
-  font-family: var(--font-display); font-size: 1.35rem; font-weight: 800;
-  color: var(--fg); letter-spacing: -0.03em; display: flex; align-items: center; gap: .3rem;
-  text-decoration: none;
+  display: flex; align-items: center; gap: .7rem; text-decoration: none; flex-shrink: 0;
 }
+.nav-logo-box {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,.15); overflow: hidden;
+}
+.nav-logo-box img { width: 40px; height: 40px; object-fit: contain; display: block; }
+.nav-logo-name {
+  font-size: 1.05rem; font-weight: 900; letter-spacing: -.04em; color: var(--fg); line-height: 1;
+}
+.nav-logo-name em { font-style: normal; opacity: .6; font-weight: 600; }
 .logo-glyph {
   width: 26px; height: 26px; border-radius: 7px;
   background: linear-gradient(135deg, var(--primary), var(--primary-4));
@@ -779,16 +788,16 @@ export default function EduCoreLandingV2() {
     hero.addEventListener("mousemove", onMove);
     hero.addEventListener("mouseleave", onLeave);
 
-    const N = 55;
-    const LINK  = 120;
-    const REPEL = 90;
-    const FORCE = 0.018;
+    const N = 160;
+    const LINK  = 90;
+    const REPEL = 100;
+    const FORCE = 0.022;
 
     const pts = Array.from({ length: N }, () => ({
       x: Math.random() * w, y: Math.random() * h,
       vx: (Math.random() - .5) * .4,
       vy: (Math.random() - .5) * .4,
-      r: Math.random() * 1.6 + .5,
+      r: Math.random() * 2 + .6,
     }));
 
     let rafId: number;
@@ -816,8 +825,15 @@ export default function EduCoreLandingV2() {
         /* crisp dot */
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(99,130,255,0.75)";
+        ctx.fillStyle = `rgba(99,130,255,${0.5 + p.r * 0.2})`;
         ctx.fill();
+        /* subtle glow on larger dots */
+        if (p.r > 1.8) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(99,130,255,0.06)";
+          ctx.fill();
+        }
       });
 
       /* connecting lines */
@@ -829,7 +845,7 @@ export default function EduCoreLandingV2() {
             ctx.beginPath();
             ctx.moveTo(pts[i].x, pts[i].y);
             ctx.lineTo(pts[j].x, pts[j].y);
-            ctx.strokeStyle = `rgba(99,130,255,${(1 - d / LINK) * 0.22})`;
+            ctx.strokeStyle = `rgba(99,130,255,${(1 - d / LINK) * 0.28})`;
             ctx.lineWidth = 0.8;
             ctx.stroke();
           }
@@ -856,7 +872,10 @@ export default function EduCoreLandingV2() {
       {/* ── NAVBAR ── */}
       <nav className={`navbar ${scrolled ? "scrolled" : ""}`}>
         <a href="/" className="nav-logo">
-          <img src="/logo2.png" alt="EduCore" style={{ height: "36px", width: "auto", objectFit: "contain" }} />
+          <div className="nav-logo-box">
+            <img src="/logo_icon.png" alt="EduCore" />
+          </div>
+          <span className="nav-logo-name">Edu<em>Core</em></span>
         </a>
         <ul className="nav-links">
           {["Features", "How it works", "About us", "Contact"].map(l => (
@@ -1285,7 +1304,7 @@ export default function EduCoreLandingV2() {
           <div className="footer-top">
             <div className="footer-brand">
               <div className="footer-brand-name">
-                <img src="/logo2.png" alt="EduCore" style={{ height: "28px", width: "auto", objectFit: "contain" }} />
+                EduCore
               </div>
               <div className="footer-brand-desc">
                 The complete student support system. Track, learn, connect, and grow throughout your university journey.

@@ -241,13 +241,13 @@ export default function Sidebar({
         }
         .sb-logo-row { position:relative; z-index:2; display:flex; align-items:center; gap:.7rem; width:100%; }
         .sb-logo-box {
-          width:36px; height:36px; border-radius:.75rem; flex-shrink:0;
-          background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3);
+          width:44px; height:44px; border-radius:12px; flex-shrink:0;
+          background:#fff; border:none;
           display:flex; align-items:center; justify-content:center;
-          backdrop-filter:blur(8px);
-          box-shadow:0 4px 14px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.25);
+          box-shadow:0 2px 10px rgba(0,0,0,.25);
+          overflow:hidden;
         }
-        .sb-logo-box img { width:22px; height:22px; object-fit:contain; filter:brightness(0) invert(1); }
+        .sb-logo-box img { width:40px; height:40px; object-fit:contain; }
         .sb-brand-text { font-size:1.05rem; font-weight:900; letter-spacing:-.04em; color:#fff; line-height:1; }
         .sb-brand-text em { font-style:normal; opacity:.7; font-weight:600; }
         .sb-dots {
@@ -389,7 +389,7 @@ export default function Sidebar({
           <div className="sb-logo-row">
             <div className="sb-logo-box">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo2.png" alt="EduCore" />
+              <img src="/logo_icon.png" alt="EduCore" />
             </div>
             <div className="sb-brand-text">Edu<em>Core</em></div>
           </div>

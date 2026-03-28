@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
 
 const NAV = [
   { label: "Features",    href: "#features"    },
@@ -107,21 +106,6 @@ export default function Navbar() {
 
         <div className="max-w-7xl mx-auto px-5 lg:px-8 flex items-center justify-between h-[66px]">
 
-          {/* ── Logo ──────────────────────────────────────── */}
-          <Link href="/" className="flex items-center shrink-0 group">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-xl bg-primary/20 blur-xl opacity-0 group-hover:opacity-70 transition-opacity duration-500 scale-110" />
-              <Image
-                src="/logo.svg"
-                alt="EduCore — Student Support System"
-                width={180}
-                height={56}
-                className="relative h-11 w-auto object-contain drop-shadow-sm group-hover:scale-[1.03] transition-transform duration-300"
-                priority
-              />
-            </div>
-          </Link>
-
           {/* ── Desktop nav ───────────────────────────────── */}
           <nav className="hidden md:flex items-center gap-1">
             {NAV.map(({ label, href }) => {
@@ -217,13 +201,7 @@ export default function Navbar() {
         <div className="relative flex flex-col h-full">
           {/* header */}
           <div className="flex items-center justify-between px-5 h-[66px] border-b border-border/60 shrink-0">
-            <Image
-              src="/logo.svg"
-              alt="EduCore"
-              width={140}
-              height={44}
-              className="h-9 w-auto object-contain"
-            />
+            <span style={{ fontSize:"1rem", fontWeight:800, letterSpacing:"-.03em", color:"var(--foreground)" }}>EduCore</span>
             <button
               onClick={() => setOpen(false)}
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-secondary text-muted-foreground transition-colors"

@@ -89,9 +89,19 @@ body { overflow: hidden; cursor: none; }
 
 /* logo */
 .rc-logo {
-  position: absolute; top: 2rem; left: 2.5rem; z-index: 20;
-  display: flex; align-items: center; text-decoration: none;
+  position: absolute; top: 1.75rem; left: 2rem; z-index: 20;
+  display: flex; align-items: center; gap: .7rem; text-decoration: none;
 }
+.rc-logo-box {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25); overflow: hidden;
+}
+.rc-logo-box img { width: 40px; height: 40px; object-fit: contain; }
+.rc-logo-name {
+  font-size: 1.05rem; font-weight: 900; letter-spacing: -.04em; color: #fff; line-height: 1;
+}
+.rc-logo-name em { font-style: normal; opacity: .7; font-weight: 600; }
 .rc-live {
   position: absolute; top: 2.1rem; right: 2.5rem; z-index: 20;
   display: flex; align-items: center; gap: .4rem;
@@ -425,7 +435,11 @@ export default function RegisterPage() {
 
       {/* Logo */}
       <a href="/" className="rc-logo">
-        <img src="/logo2.png" alt="EduCore" style={{ height: "34px", width: "auto", objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+        <div className="rc-logo-box">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo_icon.png" alt="EduCore" />
+        </div>
+        <span className="rc-logo-name">Edu<em>Core</em></span>
       </a>
       <div className="rc-live">
         <span className="rc-live-dot" />
