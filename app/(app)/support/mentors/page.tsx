@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic"
 
 import { useState, useEffect } from "react"
+import ChatModal from "@/components/ChatModal"
 
 type Session = {
   id: number
@@ -19,6 +20,7 @@ type Session = {
 
 type Mentor = {
   id: number
+  userId: number
   gpa: number
   subjects: string
   bio: string
@@ -273,6 +275,23 @@ const CSS = `
   background: oklch(0.91 0.07 145 / .6); border: 1px solid oklch(0.75 0.13 145 / .4);
   color: oklch(0.36 0.18 145); font-size: .8rem; font-weight: 700;
 }
+.sm-btn-meet {
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+  padding: .6rem 1rem; border-radius: .7rem; border: none; cursor: pointer; text-decoration: none;
+  background: linear-gradient(135deg, oklch(0.40 0.18 145), oklch(0.55 0.16 145));
+  color: #fff; font-size: .82rem; font-weight: 700; margin-top: .4rem;
+  box-shadow: 0 3px 10px oklch(0.40 0.18 145 / .3);
+  transition: opacity .18s, transform .15s, box-shadow .18s;
+}
+.sm-btn-meet:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 5px 16px oklch(0.40 0.18 145 / .38); }
+.sm-btn-chat {
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+  padding: .55rem 1rem; border-radius: .7rem; border: none; cursor: pointer;
+  background: oklch(0.93 0.05 268 / .8); border: 1.5px solid oklch(0.6231 0.1880 259.8145 / .4);
+  color: oklch(0.4882 0.2172 264.3763); font-size: .78rem; font-weight: 700; margin-top: .4rem;
+  transition: background .15s, border-color .15s;
+}
+.sm-btn-chat:hover { background: oklch(0.6231 0.1880 259.8145 / .12); border-color: oklch(0.6231 0.1880 259.8145 / .7); }
 
 /* Empty state */
 .sm-empty {
@@ -327,12 +346,18 @@ export default function SupportMentorsPage() {
   const [onlySessions, setOnlySessions] = useState(false)
   const [applying, setApplying]         = useState<number | null>(null)
   const [toast, setToast]               = useState("")
+  const [myUserId, setMyUserId]         = useState<number | null>(null)
+  const [chatWith, setChatWith]         = useState<{ userId: number; name: string } | null>(null)
 
   async function load() {
     setLoading(true)
     try {
-      const r = await fetch("/api/support/mentors")
-      if (r.ok) setMentors(await r.json())
+      const [mentorsRes, meRes] = await Promise.all([
+        fetch("/api/support/mentors"),
+        fetch("/api/profile/me"),
+      ])
+      if (mentorsRes.ok) setMentors(await mentorsRes.json())
+      if (meRes.ok) { const me = await meRes.json(); setMyUserId(me.id) }
     } finally { setLoading(false) }
   }
 
@@ -561,6 +586,22 @@ export default function SupportMentorsPage() {
                               {s.hasApplied ? (
                                 <>
                                   <div className="sm-joined-tag">✅ You&apos;re Joined</div>
+                                  {s.locationOrLink && (
+                                    <a
+                                      className="sm-btn-meet"
+                                      href={s.locationOrLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      🎥 Join Google Meet
+                                    </a>
+                                  )}
+                                  <button
+                                    className="sm-btn-chat"
+                                    onClick={() => setChatWith({ userId: mentor.userId, name: mentor.user.fullName })}
+                                  >
+                                    💬 Chat with Mentor
+                                  </button>
                                   <button className="sm-btn-leave" disabled={isLoading} onClick={() => leaveSession(s.id)}>
                                     {isLoading ? "⏳ Leaving…" : "Leave Session"}
                                   </button>
@@ -588,6 +629,16 @@ export default function SupportMentorsPage() {
 
       {/* Toast */}
       {toast && <div className="sm-toast">{toast}</div>}
+
+      {/* Chat modal */}
+      {chatWith && myUserId && (
+        <ChatModal
+          toUserId={chatWith.userId}
+          toUserName={chatWith.name}
+          currentUserId={myUserId}
+          onClose={() => setChatWith(null)}
+        />
+      )}
     </>
   )
 }
