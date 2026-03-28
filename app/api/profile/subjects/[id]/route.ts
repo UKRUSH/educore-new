@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import type { NextRequest } from "next/server"
 import { getSession } from "@/lib/auth/session"
 import { prisma } from "@/lib/db/prisma"

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/session"
 import { prisma } from "@/lib/db/prisma"
@@ -17,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <Sidebar role="ADMIN" />
+      <Sidebar role="ADMIN" name={user.fullName} photoUrl={user.photoUrl} />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar name={user.fullName} photoUrl={user.photoUrl} />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>

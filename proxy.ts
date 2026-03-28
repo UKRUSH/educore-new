@@ -28,14 +28,22 @@ function homeFor(role: string) {
   return "/dashboard"
 }
 
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = ["/", "/about"]
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
   const token = req.cookies.get(COOKIE)?.value
   const role = token ? roleFromToken(token) : null
 
   // Auth pages: redirect authenticated users to their home
-  if (pathname === "/login" || pathname === "/register") {
+  if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") {
     if (role) return NextResponse.redirect(new URL(homeFor(role), req.url))
+    return NextResponse.next()
+  }
+
+  // Public pages: accessible without auth
+  if (PUBLIC_ROUTES.includes(pathname)) {
     return NextResponse.next()
   }
 
@@ -72,6 +80,6 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|otf|pdf)$).*)",
   ],
 }

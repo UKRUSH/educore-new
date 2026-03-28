@@ -1,801 +1,712 @@
 "use client"
 
-import { useState, useEffect } from "react"
+export const dynamic = "force-dynamic"
+
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { useUserPhoto } from "@/contexts/UserPhotoContext"
 
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-const FACULTIES = [
-  "Faculty of Computer Science & Information Technology",
-  "Faculty of Engineering",
-  "Faculty of Medicine",
-  "Faculty of Law",
-  "Faculty of Business & Economics",
-  "Faculty of Arts & Social Sciences",
-  "Faculty of Science",
-  "Faculty of Education",
-  "Faculty of Architecture & Built Environment",
-  "Faculty of Pharmacy",
-]
-
-const SPORTS_OPTIONS = [
-  "Badminton", "Football", "Basketball", "Volleyball", "Table Tennis",
-  "Swimming", "Athletics", "Tennis", "Futsal", "Cycling",
-  "Martial Arts", "Squash", "Cricket", "Hockey", "Rugby",
-]
-
-const CLUB_INTERESTS = [
-  "Computer Science Society", "Robotics Club", "Debate Society",
-  "Drama Club", "Photography Club", "Music Club", "Entrepreneurship Club",
-  "Environmental Club", "Cultural Heritage Society", "Volunteer Corps",
-  "Chess Club", "Language Society", "Science Society", "Art Society",
-]
-
-const LEARNING_STYLES = [
-  { value: "visual", label: "Visual — diagrams, charts, videos" },
-  { value: "auditory", label: "Auditory — lectures, discussions" },
-  { value: "reading", label: "Reading/Writing — notes, textbooks" },
-  { value: "kinesthetic", label: "Kinesthetic — practice, hands-on" },
-]
-
-const CURRENT_YEAR = new Date().getFullYear()
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface FormData {
-  // Step 1
+type UserData = {
+  id: number
   fullName: string
-  dateOfBirth: string
-  phone: string
-  photoUrl: string
-  gender: string
-  // Step 2
+  email: string
+  studentId: string
   faculty: string
   degree: string
-  intakeYear: string
-  graduationYear: string
-  studentId: string
-  // Step 3
-  sports: string[]
-  clubInterests: string[]
-  learningStyle: string
+  intakeYear: number
+  photoUrl: string | null
+  phone: string | null
+  dateOfBirth: string | null
+  gender: string | null
+  role: string
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
+const STEPS = [
+  { num: 1, label: "Welcome",  icon: "👋" },
+  { num: 2, label: "Photo",    icon: "📸" },
+  { num: 3, label: "Details",  icon: "📋" },
+  { num: 4, label: "Done",     icon: "🎉" },
+]
+
+const GENDERS = ["Male", "Female", "Prefer not to say"]
+
+const CSS = `
+*, *::before, *::after { box-sizing: border-box; }
+
+.su-page {
+  min-height: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-start; padding: 1.5rem 1rem 4rem;
+  background: var(--background);
+}
+
+/* ── Progress stepper ── */
+.su-stepper {
+  display: flex; align-items: flex-start; width: 100%; max-width: 540px;
+  margin-bottom: 2rem;
+}
+.su-step { display: flex; flex-direction: column; align-items: center; gap: .35rem; flex: 1; }
+.su-step-circle {
+  width: 2.5rem; height: 2.5rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .85rem; font-weight: 800; transition: all .3s;
+  border: 2px solid transparent; flex-shrink: 0;
+}
+.su-step-circle.done {
+  background: linear-gradient(135deg, oklch(0.55 0.2 250), oklch(0.48 0.22 265));
+  color: #fff; border-color: oklch(0.55 0.2 250);
+  box-shadow: 0 2px 10px oklch(0.55 0.2 250 / 0.35);
+}
+.su-step-circle.active {
+  background: linear-gradient(135deg, oklch(0.6 0.2 250), oklch(0.52 0.22 265));
+  color: #fff; border-color: oklch(0.6 0.2 250);
+  box-shadow: 0 2px 20px oklch(0.6 0.2 250 / 0.5);
+  animation: suPulse 2s ease-in-out infinite;
+}
+.su-step-circle.pending { background: var(--card); color: var(--muted-foreground); border-color: var(--border); }
+@keyframes suPulse {
+  0%,100% { box-shadow: 0 2px 16px oklch(0.6 0.2 250 / 0.45); }
+  50%      { box-shadow: 0 2px 28px oklch(0.6 0.2 250 / 0.7); }
+}
+.su-step-label { font-size: .68rem; font-weight: 600; color: var(--muted-foreground); white-space: nowrap; }
+.su-step-label.active { color: oklch(0.55 0.2 250); font-weight: 700; }
+.su-step-label.done   { color: oklch(0.48 0.18 145); }
+.su-connector { flex: 1; height: 2px; margin: 1.25rem .15rem 0; border-radius: 1px; transition: background .4s; }
+.su-connector.done { background: linear-gradient(90deg, oklch(0.55 0.2 250), oklch(0.48 0.22 265)); }
+.su-connector.pending { background: var(--border); }
+
+/* ── Card ── */
+.su-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1.25rem; width: 100%; max-width: 540px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.08);
+  overflow: hidden; animation: suSlideIn .3s cubic-bezier(.22,1,.36,1);
+}
+@keyframes suSlideIn {
+  from { opacity: 0; transform: translateY(14px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+.su-banner {
+  height: 5px;
+  background: linear-gradient(90deg, oklch(0.62 0.22 240), oklch(0.56 0.24 265), oklch(0.5 0.2 295));
+}
+.su-body { padding: 2rem 2rem 1.75rem; }
+
+/* ── Step 1: Welcome ── */
+.su-w-icon {
+  width: 5.5rem; height: 5.5rem; border-radius: 1.35rem; margin: 0 auto 1.5rem;
+  background: linear-gradient(135deg, oklch(0.88 0.08 250), oklch(0.82 0.12 265));
+  display: flex; align-items: center; justify-content: center; font-size: 2.5rem;
+  box-shadow: 0 6px 24px oklch(0.62 0.2 250 / 0.2);
+}
+.su-w-title { font-size: 1.5rem; font-weight: 800; color: var(--foreground); text-align: center; margin: 0 0 .5rem; }
+.su-w-sub   { font-size: .875rem; color: var(--muted-foreground); text-align: center; line-height: 1.6; margin: 0 0 1.75rem; }
+
+.su-user-chip {
+  display: flex; align-items: center; gap: 1rem;
+  background: oklch(0.97 0.02 250 / 0.5); border: 1px solid oklch(0.88 0.06 250);
+  border-radius: 1rem; padding: .9rem 1.1rem; margin-bottom: 1.5rem;
+}
+.su-chip-avatar {
+  width: 3rem; height: 3rem; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, oklch(0.62 0.2 250), oklch(0.54 0.22 270));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; font-weight: 800; color: #fff; overflow: hidden;
+}
+.su-chip-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.su-chip-name { font-weight: 700; color: var(--foreground); font-size: .95rem; }
+.su-chip-sub  { font-size: .75rem; color: var(--muted-foreground); margin-top: .1rem; }
+
+.su-checklist { display: flex; flex-direction: column; gap: .1rem; margin-bottom: 1.75rem; }
+.su-check-item {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .75rem .9rem; border-radius: .75rem;
+  transition: background .15s;
+}
+.su-check-item:hover { background: var(--accent); }
+.su-check-bubble {
+  width: 2.25rem; height: 2.25rem; border-radius: .6rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 1rem;
+}
+.su-check-title { font-size: .875rem; font-weight: 700; color: var(--foreground); }
+.su-check-sub   { font-size: .75rem; color: var(--muted-foreground); margin-top: .1rem; }
+
+/* ── Step 2: Photo ── */
+.su-ph-area { display: flex; flex-direction: column; align-items: center; margin-bottom: 1.5rem; }
+.su-ph-ring {
+  width: 10rem; height: 10rem; border-radius: 50%;
+  border: 3px dashed var(--border); background: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; position: relative; overflow: hidden;
+  transition: border-color .2s, box-shadow .2s; margin-bottom: 1rem;
+  user-select: none; -webkit-user-select: none;
+}
+.su-ph-ring:hover  { border-color: oklch(0.6 0.2 250); box-shadow: 0 0 0 5px oklch(0.6 0.2 250 / 0.12); }
+.su-ph-ring:focus  { outline: 2px solid oklch(0.6 0.2 250); outline-offset: 3px; }
+.su-ph-ring img    { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.su-ph-inner       { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+.su-ph-ic          { font-size: 2.25rem; }
+.su-ph-txt         { font-size: .78rem; color: var(--muted-foreground); font-weight: 600; }
+.su-ph-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .2s; color: #fff; font-size: .8rem; font-weight: 700;
+}
+.su-ph-ring:hover .su-ph-overlay { opacity: 1; }
+.su-ph-hint { font-size: .75rem; color: var(--muted-foreground); }
+
+.su-status { text-align: center; font-size: .8rem; font-weight: 600; padding: .55rem .9rem; border-radius: .6rem; margin-top: .75rem; width: 100%; }
+.su-status.ok  { color: oklch(0.42 0.2 145); background: oklch(0.94 0.07 145 / 0.5); }
+.su-status.err { color: oklch(0.5 0.22 25); background: oklch(0.95 0.06 25 / 0.5); }
+.su-status.uploading { color: oklch(0.5 0.18 250); background: oklch(0.95 0.04 250 / 0.5); }
+
+/* ── Step 3: Details ── */
+.su-section-title {
+  font-size: 1.25rem; font-weight: 800; color: var(--foreground); margin: 0 0 .35rem;
+}
+.su-section-sub { font-size: .875rem; color: var(--muted-foreground); margin: 0 0 1.5rem; }
+.su-form { display: flex; flex-direction: column; gap: .95rem; }
+.su-row  { display: grid; grid-template-columns: repeat(2,1fr); gap: .85rem; }
+.su-field { display: flex; flex-direction: column; gap: .4rem; }
+.su-lbl  { font-size: .74rem; font-weight: 700; color: var(--muted-foreground); letter-spacing: .02em; }
+.su-lbl-req { color: oklch(0.55 0.22 25); }
+.su-inp {
+  width: 100%; border: 1.5px solid var(--border); background: var(--background);
+  border-radius: .65rem; padding: .65rem .85rem; font-size: .875rem;
+  color: var(--foreground); outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.su-inp:focus { border-color: oklch(0.62 0.2 250); box-shadow: 0 0 0 3px oklch(0.62 0.2 250 / 0.15); }
+.su-sel {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .65rem center; background-size: 1rem; padding-right: 2.5rem;
+}
+.su-locked {
+  background: oklch(0.97 0.015 250 / 0.5); border: 1px solid oklch(0.9 0.04 250);
+  border-radius: .85rem; padding: .95rem 1.1rem; margin-top: .35rem;
+}
+.su-locked-head {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted-foreground); margin-bottom: .7rem;
+}
+.su-locked-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: .3rem; }
+.su-locked-item { padding: .4rem 0; }
+.su-locked-key { font-size: .7rem; color: var(--muted-foreground); }
+.su-locked-val { font-size: .82rem; font-weight: 600; color: var(--foreground); margin-top: .1rem; word-break: break-word; }
+
+/* ── Step 4: Done ── */
+.su-done-ring {
+  width: 6.5rem; height: 6.5rem; border-radius: 50%; margin: 0 auto 1.5rem;
+  background: linear-gradient(135deg, oklch(0.52 0.22 145), oklch(0.44 0.24 155));
+  display: flex; align-items: center; justify-content: center; font-size: 2.75rem;
+  box-shadow: 0 6px 28px oklch(0.52 0.22 145 / 0.38);
+  animation: suBounce .55s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes suBounce {
+  0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+  60%  { transform: scale(1.15) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+.su-done-title { font-size: 1.5rem; font-weight: 800; text-align: center; color: var(--foreground); margin: 0 0 .4rem; }
+.su-done-sub { font-size: .875rem; color: var(--muted-foreground); text-align: center; line-height: 1.55; margin: 0 0 1.75rem; }
+.su-summary {
+  background: var(--muted); border: 1px solid var(--border);
+  border-radius: .9rem; padding: .9rem 1.1rem; margin-bottom: 1.5rem;
+}
+.su-sum-row { display: flex; align-items: center; gap: .75rem; padding: .45rem 0; }
+.su-sum-row + .su-sum-row { border-top: 1px solid var(--border); }
+.su-sum-ic  { font-size: 1rem; width: 1.5rem; text-align: center; flex-shrink: 0; }
+.su-sum-key { font-size: .78rem; color: var(--muted-foreground); flex: 1; }
+.su-sum-val { font-size: .82rem; font-weight: 700; color: var(--foreground); text-align: right; max-width: 55%; word-break: break-word; }
+
+.su-next-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); margin-bottom: .65rem; }
+.su-next-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: .65rem; }
+.su-next-card {
+  display: flex; flex-direction: column; gap: .35rem;
+  padding: .9rem 1rem; border-radius: .85rem;
+  border: 1px solid var(--border); text-decoration: none;
+  transition: border-color .2s, box-shadow .2s, transform .15s;
+}
+.su-next-card:hover { border-color: oklch(0.65 0.18 250 / 0.4); box-shadow: 0 3px 14px oklch(0.6 0.15 250 / 0.1); transform: translateY(-2px); }
+.su-next-icon { font-size: 1.35rem; margin-bottom: .1rem; }
+.su-next-title { font-size: .82rem; font-weight: 700; color: var(--foreground); }
+.su-next-sub   { font-size: .72rem; color: var(--muted-foreground); line-height: 1.4; }
+
+/* ── Buttons ── */
+.su-btn-row { display: flex; gap: .65rem; margin-top: 1.5rem; }
+.su-btn-primary {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: .45rem;
+  background: linear-gradient(135deg, oklch(0.62 0.2 250), oklch(0.54 0.22 265));
+  color: #fff; border: none; border-radius: .8rem;
+  padding: .85rem 1.5rem; font-size: .9rem; font-weight: 700;
+  cursor: pointer; transition: opacity .2s, transform .15s;
+  box-shadow: 0 3px 14px oklch(0.58 0.2 250 / 0.38);
+}
+.su-btn-primary:hover   { opacity: .9; transform: translateY(-1px); }
+.su-btn-primary:active  { transform: translateY(0); }
+.su-btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.su-btn-ghost {
+  display: flex; align-items: center; justify-content: center; gap: .35rem;
+  background: transparent; color: var(--muted-foreground);
+  border: 1.5px solid var(--border); border-radius: .8rem;
+  padding: .85rem 1.25rem; font-size: .875rem; font-weight: 600;
+  cursor: pointer; transition: background .15s, color .15s; min-width: 5.5rem;
+}
+.su-btn-ghost:hover { background: var(--accent); color: var(--foreground); }
+
+/* ── Error ── */
+.su-err {
+  background: oklch(0.97 0.05 25 / 0.5); border: 1px solid oklch(0.85 0.1 25);
+  border-radius: .65rem; padding: .75rem 1rem; font-size: .82rem;
+  color: oklch(0.5 0.22 25); margin-top: .85rem;
+}
+
+/* ── Skeleton ── */
+.su-skel { background: var(--muted); border-radius: .75rem; animation: suSkel 1.4s ease-in-out infinite; }
+@keyframes suSkel { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+`
 
 export default function ProfileSetupPage() {
   const router = useRouter()
+  const { setPhotoUrl: setContextPhotoUrl } = useUserPhoto()
+  const fileRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState(1)
+  const [user, setUser] = useState<UserData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Photo
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoMsg, setPhotoMsg] = useState<{ kind: "ok" | "err" | "uploading"; text: string } | null>(null)
+
+  // Details
+  const [form, setForm] = useState({ fullName: "", phone: "", dateOfBirth: "", gender: "" })
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState("")
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState("")
-  const [previewSrc, setPreviewSrc] = useState("")
+  const [saveErr, setSaveErr] = useState("")
 
-  const [form, setForm] = useState<FormData>({
-    fullName: "",
-    dateOfBirth: "",
-    phone: "",
-    photoUrl: "",
-    gender: "",
-    faculty: "",
-    degree: "",
-    intakeYear: "",
-    graduationYear: "",
-    studentId: "",
-    sports: [],
-    clubInterests: [],
-    learningStyle: "",
-  })
-
-  // Pre-fill from API
   useEffect(() => {
     fetch("/api/profile/me")
       .then((r) => r.json())
-      .then((data) => {
-        if (data.error) return
-        setForm((prev) => ({
-          ...prev,
-          fullName: data.fullName ?? "",
-          phone: data.phone ?? "",
-          photoUrl: data.photoUrl ?? "",
-          gender: data.gender ?? "",
-          dateOfBirth: data.dateOfBirth
-            ? new Date(data.dateOfBirth).toISOString().split("T")[0]
-            : "",
-          faculty: data.faculty ?? "",
-          degree: data.degree ?? "",
-          intakeYear: data.intakeYear ? String(data.intakeYear) : "",
-          studentId: data.studentId ?? "",
-        }))
-        if (data.photoUrl) setPreviewSrc(data.photoUrl)
+      .then((d: UserData) => {
+        setUser(d)
+        setPhotoPreview(d.photoUrl ?? null)
+        setForm({
+          fullName:    d.fullName ?? "",
+          phone:       d.phone ?? "",
+          dateOfBirth: d.dateOfBirth ? d.dateOfBirth.split("T")[0] : "",
+          gender:      d.gender ?? "",
+        })
       })
-      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  // Auto-compute graduation year
-  useEffect(() => {
-    const year = parseInt(form.intakeYear)
-    if (!isNaN(year) && year > 1990) {
-      setForm((prev) => ({ ...prev, graduationYear: String(year + 4) }))
-    }
-  }, [form.intakeYear])
+  const initials = user?.fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() ?? "?"
 
-  function set(field: keyof FormData, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }))
+  // Open file picker. Reset value AFTER click so the same file can be
+  // re-selected next time — resetting BEFORE click breaks the browser's
+  // user-gesture chain on some browsers (Chrome/Safari).
+  function triggerFilePicker() {
+    if (!fileRef.current) return
+    fileRef.current.click()
   }
 
-  function toggleChip(field: "sports" | "clubInterests", value: string) {
-    setForm((prev) => ({
-      ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter((v) => v !== value)
-        : [...prev[field], value],
-    }))
-  }
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function uploadPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const objectUrl = URL.createObjectURL(file)
-    setPreviewSrc(objectUrl)
-    setUploadError("")
-    setUploading(true)
+
+    // Show local blob preview instantly
+    const blobUrl = URL.createObjectURL(file)
+    setPhotoPreview(blobUrl)
+    setPhotoUploading(true)
+    setPhotoMsg({ kind: "uploading", text: "Uploading your photo…" })
+
+    // Reset input value NOW (after we've read the file) so the picker
+    // can fire onChange again even if the user picks the same file next time
+    if (fileRef.current) fileRef.current.value = ""
+
+    const fd = new FormData()
+    fd.append("photo", file)
     try {
-      const data = new FormData()
-      data.append("photo", file)
-      const res = await fetch("/api/profile/upload", { method: "POST", body: data })
-      const json = await res.json()
+      const res = await fetch("/api/profile/upload", { method: "POST", body: fd })
+      const data = await res.json()
       if (!res.ok) {
-        setUploadError(json.error ?? "Upload failed.")
-        setPreviewSrc("")
-        URL.revokeObjectURL(objectUrl)
+        setPhotoMsg({ kind: "err", text: data.error ?? "Upload failed." })
         return
       }
-      set("photoUrl", json.photoUrl)
-      URL.revokeObjectURL(objectUrl)
-      setPreviewSrc(json.photoUrl)
+      // Swap blob URL for the permanent server URL
+      setPhotoPreview(data.photoUrl)
+      setPhotoMsg({ kind: "ok", text: "Photo updated! ✓" })
+      setUser((u) => u ? { ...u, photoUrl: data.photoUrl } : u)
+      // Update shared context so Topbar re-renders with new photo immediately
+      setContextPhotoUrl(data.photoUrl)
+      router.refresh()
     } catch {
-      setUploadError("Network error. Please try again.")
-      setPreviewSrc("")
-      URL.revokeObjectURL(objectUrl)
+      setPhotoMsg({ kind: "err", text: "Upload failed. Please try again." })
     } finally {
-      setUploading(false)
+      setPhotoUploading(false)
     }
   }
 
-  function validateStep(): string {
-    if (step === 1) {
-      if (!form.fullName.trim()) return "Full name is required."
-      if (form.phone && !/^\d{7,15}$/.test(form.phone.replace(/[-\s]/g, "")))
-        return "Enter a valid phone number."
-    }
-    if (step === 2) {
-      if (!form.faculty) return "Please select your faculty."
-      if (!form.degree.trim()) return "Degree program is required."
-      const year = parseInt(form.intakeYear)
-      if (isNaN(year) || year < 1990 || year > CURRENT_YEAR)
-        return `Intake year must be between 1990 and ${CURRENT_YEAR}.`
-    }
-    return ""
-  }
-
-  function handleNext() {
-    const err = validateStep()
-    if (err) { setError(err); return }
-    setError("")
-    setStep((s) => s + 1)
-  }
-
-  function handleBack() {
-    setError("")
-    setStep((s) => s - 1)
-  }
-
-  async function handleFinish() {
-    const err = validateStep()
-    if (err) { setError(err); return }
-    setError("")
-    setSaving(true)
+  async function saveDetails() {
+    if (!form.fullName.trim()) { setSaveErr("Full name is required."); return }
+    setSaving(true); setSaveErr("")
     try {
       const res = await fetch("/api/profile/me", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullName: form.fullName.trim(),
+          fullName: form.fullName,
           phone: form.phone || null,
           dateOfBirth: form.dateOfBirth || null,
           gender: form.gender || null,
-          photoUrl: form.photoUrl || null,
         }),
       })
-      if (!res.ok) {
-        const data = await res.json()
-        setError(data.error ?? "Failed to save profile.")
-        return
-      }
-      router.push("/profile")
-    } catch {
-      setError("Something went wrong. Please try again.")
-    } finally {
-      setSaving(false)
-    }
+      const data = await res.json()
+      if (!res.ok) { setSaveErr(data.error ?? "Failed to save."); return }
+      setUser((u) => u ? { ...u, ...data } : u)
+      setStep(4)
+    } catch { setSaveErr("Something went wrong. Please try again.") }
+    finally { setSaving(false) }
   }
 
-  const initials = form.fullName
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "?"
+  // ── Loading skeleton ──
+  if (loading) {
+    return (
+      <div className="su-page">
+        <style>{CSS}</style>
+        <div style={{ width: "100%", maxWidth: 540 }}>
+          <div className="su-skel" style={{ height: "2.5rem", marginBottom: "2rem", borderRadius: 9999 }} />
+          <div className="su-skel" style={{ height: "460px" }} />
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Page title */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Edit Profile</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Keep your profile up to date for a better experience.
-        </p>
+    <div className="su-page">
+      <style>{CSS}</style>
+
+      {/* ── Stepper ── */}
+      <div className="su-stepper">
+        {STEPS.map((s, i) => (
+          <div key={s.num} style={{ display: "contents" }}>
+            <div className="su-step">
+              <div className={`su-step-circle ${step > s.num ? "done" : step === s.num ? "active" : "pending"}`}>
+                {step > s.num
+                  ? <svg width="14" height="14" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                  : s.icon}
+              </div>
+              <span className={`su-step-label ${step > s.num ? "done" : step === s.num ? "active" : ""}`}>{s.label}</span>
+            </div>
+            {i < STEPS.length - 1 && (
+              <div className={`su-connector ${step > s.num ? "done" : "pending"}`} />
+            )}
+          </div>
+        ))}
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
+      {/* ════════════════════════════════════════════ */}
+      {/* STEP 1 – Welcome                            */}
+      {/* ════════════════════════════════════════════ */}
+      {step === 1 && (
+        <div className="su-card">
+          <div className="su-banner" />
+          <div className="su-body">
+            <div className="su-w-icon">🎓</div>
+            <h1 className="su-w-title">Welcome to EduCore!</h1>
+            <p className="su-w-sub">
+              Complete your student profile in 3 quick steps. It takes less than 2 minutes.
+            </p>
 
-        {/* ── Left: Form ────────────────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0">
+            {/* User chip */}
+            <div className="su-user-chip">
+              <div className="su-chip-avatar">
+                {user?.photoUrl
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={user.photoUrl} alt="" />
+                  : initials}
+              </div>
+              <div>
+                <div className="su-chip-name">{user?.fullName}</div>
+                <div className="su-chip-sub">{user?.studentId} · {user?.faculty}</div>
+              </div>
+            </div>
 
-          {/* Step progress */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-foreground">
-                Step {step} of 3 &mdash;{" "}
-                <span className="text-muted-foreground">
-                  {step === 1 ? "Personal Details" : step === 2 ? "Academic Info" : "Interests"}
-                </span>
-              </p>
-              <p className="text-xs text-muted-foreground">{Math.round((step / 3) * 100)}%</p>
-            </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full transition-all duration-300"
-                style={{ width: `${(step / 3) * 100}%` }}
-              />
-            </div>
-            <div className="flex justify-between mt-2">
-              {["Personal", "Academic", "Interests"].map((label, i) => (
-                <div key={label} className="flex items-center gap-1.5">
-                  <div
-                    className={`h-5 w-5 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
-                      i + 1 < step
-                        ? "bg-primary border-primary text-primary-foreground"
-                        : i + 1 === step
-                        ? "border-primary text-primary bg-primary/10"
-                        : "border-border text-muted-foreground bg-muted"
-                    }`}
-                  >
-                    {i + 1 < step ? (
-                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    ) : (
-                      i + 1
-                    )}
+            {/* Steps checklist */}
+            <div className="su-checklist">
+              {[
+                { icon: "📸", bg: "oklch(0.9 0.06 250)", title: "Upload a profile photo", sub: "Help people recognise you" },
+                { icon: "📋", bg: "oklch(0.9 0.06 295)", title: "Fill in personal details", sub: "Phone, birthday & gender" },
+                { icon: "🎉", bg: "oklch(0.9 0.06 145)", title: "Profile complete!",       sub: "Start exploring EduCore" },
+              ].map((item) => (
+                <div key={item.title} className="su-check-item">
+                  <div className="su-check-bubble" style={{ background: item.bg }}>{item.icon}</div>
+                  <div>
+                    <div className="su-check-title">{item.title}</div>
+                    <div className="su-check-sub">{item.sub}</div>
                   </div>
-                  <span
-                    className={`text-xs font-medium hidden sm:block ${
-                      i + 1 === step ? "text-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    {label}
-                  </span>
                 </div>
               ))}
             </div>
+
+            <div className="su-btn-row" style={{ marginTop: 0 }}>
+              <button className="su-btn-primary" onClick={() => setStep(2)}>
+                Get Started
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </button>
+            </div>
           </div>
+        </div>
+      )}
 
-          {/* Form card */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            {error && (
-              <div className="mb-5 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
-                {error}
+      {/* ════════════════════════════════════════════ */}
+      {/* STEP 2 – Photo                              */}
+      {/* ════════════════════════════════════════════ */}
+      {step === 2 && (
+        <div className="su-card">
+          <div className="su-banner" />
+          <div className="su-body">
+            <h2 className="su-section-title">Profile Photo</h2>
+            <p className="su-section-sub">
+              Upload a clear photo so classmates and lecturers can recognise you.
+            </p>
+
+            <div className="su-ph-area">
+              {/* Use div + onClick instead of label/htmlFor so clicking on the
+                  image itself reliably opens the picker every time */}
+              <div className="su-ph-ring" onClick={triggerFilePicker} role="button" tabIndex={0}
+                onKeyDown={(e) => e.key === "Enter" && triggerFilePicker()}>
+                {photoPreview ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photoPreview} alt="Preview" />
+                    <div className="su-ph-overlay">
+                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ marginRight: ".3rem" }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+                      </svg>
+                      Change Photo
+                    </div>
+                  </>
+                ) : (
+                  <div className="su-ph-inner">
+                    <span className="su-ph-ic">📷</span>
+                    <span className="su-ph-txt">Click to upload</span>
+                  </div>
+                )}
               </div>
-            )}
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={uploadPhoto} />
+              <p className="su-ph-hint">JPG, PNG or WebP · max 5 MB</p>
 
-            {/* ── Step 1: Personal Details ──────────────────────────────────── */}
-            {step === 1 && (
-              <div className="space-y-5">
-                <h2 className="text-base font-semibold text-foreground">Personal Details</h2>
+              {/* Explicit change button — always visible when photo exists */}
+              {photoPreview && (
+                <button
+                  type="button"
+                  onClick={triggerFilePicker}
+                  disabled={photoUploading}
+                  style={{
+                    display: "flex", alignItems: "center", gap: ".4rem",
+                    background: "transparent", border: "1.5px solid var(--border)",
+                    borderRadius: ".6rem", padding: ".45rem 1rem",
+                    fontSize: ".78rem", fontWeight: 600, color: "var(--muted-foreground)",
+                    cursor: "pointer", marginTop: ".35rem", transition: "all .15s",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "oklch(0.62 0.2 250)"; (e.currentTarget as HTMLButtonElement).style.color = "oklch(0.55 0.2 250)" }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--muted-foreground)" }}
+                >
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  Change Photo
+                </button>
+              )}
 
-                {/* Photo Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Profile Photo <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <label
-                    className={`flex items-center gap-3 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm cursor-pointer transition ${
-                      uploading ? "opacity-60 pointer-events-none" : "hover:border-primary/50"
-                    }`}
-                  >
-                    <span className="shrink-0 text-muted-foreground">
-                      {uploading ? (
-                        <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-                        </svg>
-                      ) : (
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                        </svg>
-                      )}
-                    </span>
-                    <span className="text-muted-foreground truncate flex-1">
-                      {uploading
-                        ? "Uploading…"
-                        : form.photoUrl
-                        ? form.photoUrl.split("/").pop()
-                        : "Choose an image…"}
-                    </span>
-                    {form.photoUrl && !uploading && (
-                      <span className="text-xs text-green-600 dark:text-green-400 shrink-0">✓ Uploaded</span>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="sr-only"
-                      onChange={handleFileChange}
-                      disabled={uploading}
-                    />
-                  </label>
-                  {uploadError ? (
-                    <p className="text-xs text-destructive mt-1">{uploadError}</p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WebP or GIF — max 5 MB.</p>
+              {photoMsg && (
+                <div className={`su-status ${photoMsg.kind}`}>
+                  {photoMsg.kind === "uploading" && (
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" className="animate-spin" style={{ display: "inline", marginRight: ".35rem" }}>
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" style={{ opacity: .25 }} />
+                      <path fill="currentColor" d="M4 12a8 8 0 018-8v8z" style={{ opacity: .75 }} />
+                    </svg>
                   )}
+                  {photoMsg.kind === "ok"  && "✓ "}
+                  {photoMsg.kind === "err" && "✗ "}
+                  {photoMsg.text}
                 </div>
+              )}
+            </div>
 
-                {/* Full Name */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Full Name <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.fullName}
-                    onChange={(e) => set("fullName", e.target.value)}
-                    placeholder="Ahmad bin Abdullah"
-                    className={INPUT}
-                  />
-                </div>
+            <div className="su-btn-row">
+              <button className="su-btn-ghost" onClick={() => setStep(1)}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                Back
+              </button>
+              <button className="su-btn-primary" onClick={() => setStep(3)} disabled={photoUploading}>
+                {photoPreview ? "Continue" : "Skip for now"}
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Date of Birth */}
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Date of Birth <span className="text-muted-foreground font-normal">(optional)</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={form.dateOfBirth}
-                      onChange={(e) => set("dateOfBirth", e.target.value)}
-                      max={new Date().toISOString().split("T")[0]}
-                      className={INPUT}
-                    />
-                  </div>
+      {/* ════════════════════════════════════════════ */}
+      {/* STEP 3 – Details                            */}
+      {/* ════════════════════════════════════════════ */}
+      {step === 3 && (
+        <div className="su-card">
+          <div className="su-banner" />
+          <div className="su-body">
+            <h2 className="su-section-title">Personal Details</h2>
+            <p className="su-section-sub">
+              Complete your profile. You can always update this later in Settings.
+            </p>
 
-                  {/* Phone */}
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Phone Number <span className="text-muted-foreground font-normal">(optional)</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={form.phone}
-                      onChange={(e) => set("phone", e.target.value)}
-                      placeholder="0123456789"
-                      className={INPUT}
-                    />
-                  </div>
-                </div>
-
-                {/* Gender */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Gender <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <div className="flex gap-3">
-                    {["Male", "Female", "Prefer not to say"].map((g) => (
-                      <button
-                        key={g}
-                        type="button"
-                        onClick={() => set("gender", form.gender === g ? "" : g)}
-                        className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                          form.gender === g
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                        }`}
-                      >
-                        {g}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <div className="su-form">
+              <div className="su-field">
+                <label className="su-lbl">Full Name <span className="su-lbl-req">*</span></label>
+                <input className="su-inp" placeholder="Your full name"
+                  value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} />
               </div>
-            )}
 
-            {/* ── Step 2: Academic Info ─────────────────────────────────────── */}
-            {step === 2 && (
-              <div className="space-y-5">
-                <h2 className="text-base font-semibold text-foreground">Academic Info</h2>
-
-                {/* Student ID (read-only) */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Student ID
-                  </label>
-                  <input
-                    type="text"
-                    value={form.studentId}
-                    readOnly
-                    className={INPUT + " opacity-60 cursor-not-allowed"}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Student ID cannot be changed after registration.
-                  </p>
+              <div className="su-row">
+                <div className="su-field">
+                  <label className="su-lbl">Phone Number</label>
+                  <input className="su-inp" placeholder="+60123456789"
+                    value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
                 </div>
-
-                {/* Faculty */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Faculty <span className="text-destructive">*</span>
-                  </label>
-                  <select
-                    value={form.faculty}
-                    onChange={(e) => set("faculty", e.target.value)}
-                    className={INPUT}
-                  >
-                    <option value="">Select your faculty</option>
-                    {FACULTIES.map((f) => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
+                <div className="su-field">
+                  <label className="su-lbl">Gender</label>
+                  <select className="su-inp su-sel" value={form.gender}
+                    onChange={(e) => setForm((p) => ({ ...p, gender: e.target.value }))}>
+                    <option value="">Select…</option>
+                    {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
+              </div>
 
-                {/* Degree */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Degree Program <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.degree}
-                    onChange={(e) => set("degree", e.target.value)}
-                    placeholder="e.g. Bachelor of Computer Science"
-                    className={INPUT}
-                  />
+              <div className="su-field">
+                <label className="su-lbl">Date of Birth</label>
+                <input className="su-inp" type="date"
+                  value={form.dateOfBirth}
+                  max={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setForm((p) => ({ ...p, dateOfBirth: e.target.value }))} />
+              </div>
+
+              {/* Read-only academic info */}
+              <div className="su-locked">
+                <div className="su-locked-head">
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                  Academic info (set at registration)
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Intake Year */}
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Intake Year <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={form.intakeYear}
-                      onChange={(e) => set("intakeYear", e.target.value)}
-                      placeholder="e.g. 2022"
-                      min={1990}
-                      max={CURRENT_YEAR}
-                      className={INPUT}
-                    />
-                  </div>
-
-                  {/* Graduation Year (auto) */}
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Expected Graduation
-                    </label>
-                    <input
-                      type="number"
-                      value={form.graduationYear}
-                      readOnly
-                      className={INPUT + " opacity-60 cursor-not-allowed"}
-                    />
-                  </div>
+                <div className="su-locked-grid">
+                  {[
+                    { k: "Student ID",  v: user?.studentId },
+                    { k: "Email",       v: user?.email },
+                    { k: "Faculty",     v: user?.faculty },
+                    { k: "Degree",      v: user?.degree },
+                    { k: "Intake Year", v: user?.intakeYear },
+                    { k: "Role",        v: user?.role },
+                  ].map((r) => (
+                    <div key={r.k} className="su-locked-item">
+                      <div className="su-locked-key">{r.k}</div>
+                      <div className="su-locked-val">{r.v}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* ── Step 3: Interests ─────────────────────────────────────────── */}
-            {step === 3 && (
-              <div className="space-y-6">
-                <h2 className="text-base font-semibold text-foreground">Interests</h2>
-                <p className="text-sm text-muted-foreground -mt-3">
-                  Help us personalize your experience. All optional.
-                </p>
+            {saveErr && <div className="su-err">{saveErr}</div>}
 
-                {/* Sports */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-3">
-                    Sports Interests
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {SPORTS_OPTIONS.map((s) => (
-                      <Chip
-                        key={s}
-                        label={s}
-                        active={form.sports.includes(s)}
-                        onClick={() => toggleChip("sports", s)}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Club Interests */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-3">
-                    Club & Society Interests
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {CLUB_INTERESTS.map((c) => (
-                      <Chip
-                        key={c}
-                        label={c}
-                        active={form.clubInterests.includes(c)}
-                        onClick={() => toggleChip("clubInterests", c)}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Learning Style */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-3">
-                    Learning Style Preference
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {LEARNING_STYLES.map((ls) => (
-                      <button
-                        key={ls.value}
-                        type="button"
-                        onClick={() => set("learningStyle", form.learningStyle === ls.value ? "" : ls.value)}
-                        className={`text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
-                          form.learningStyle === ls.value
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                        }`}
-                      >
-                        {ls.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ── Navigation buttons ───────────────────────────────────────── */}
-            <div className="flex items-center justify-between mt-8 pt-5 border-t border-border">
-              {step > 1 ? (
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-accent/50 transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                  </svg>
-                  Back
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => router.push("/profile")}
-                  className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
-                >
-                  Cancel
-                </button>
-              )}
-
-              {step < 3 ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                  Next
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleFinish}
-                  disabled={saving}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-60 transition-opacity"
-                >
-                  {saving ? (
-                    <>
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-                      </svg>
-                      Saving…
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                      Save Profile
-                    </>
-                  )}
-                </button>
-              )}
+            <div className="su-btn-row">
+              <button className="su-btn-ghost" onClick={() => setStep(2)}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                Back
+              </button>
+              <button className="su-btn-primary" onClick={saveDetails} disabled={saving || !form.fullName.trim()}>
+                {saving ? "Saving…" : "Save & Finish"}
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
-
-        {/* ── Right: Live Preview ────────────────────────────────────────────── */}
-        <div className="w-full lg:w-72 shrink-0">
-          <div className="sticky top-6">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Live Preview
-            </p>
-            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-              {/* Avatar + name */}
-              <div className="flex items-center gap-3">
-                <div className="h-14 w-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden ring-2 ring-primary/20">
-                  {(previewSrc || form.photoUrl) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={previewSrc || form.photoUrl}
-                      alt="Preview"
-                      className="h-full w-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
-                    />
-                  ) : (
-                    initials
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-foreground truncate">
-                    {form.fullName || "Your Name"}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {form.studentId || "Student ID"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 text-sm">
-                {form.gender && (
-                  <PreviewRow label="Gender" value={form.gender} />
-                )}
-                {form.dateOfBirth && (
-                  <PreviewRow
-                    label="Birthday"
-                    value={new Date(form.dateOfBirth).toLocaleDateString("en-MY", {
-                      day: "numeric", month: "short", year: "numeric",
-                    })}
-                  />
-                )}
-                {form.phone && <PreviewRow label="Phone" value={form.phone} />}
-              </div>
-
-              {(form.faculty || form.degree || form.intakeYear) && (
-                <div className="pt-3 border-t border-border space-y-1.5 text-sm">
-                  {form.faculty && (
-                    <PreviewRow label="Faculty" value={form.faculty.replace("Faculty of ", "")} />
-                  )}
-                  {form.degree && <PreviewRow label="Degree" value={form.degree} />}
-                  {form.intakeYear && (
-                    <PreviewRow
-                      label="Intake"
-                      value={`${form.intakeYear} → ${form.graduationYear || "—"}`}
-                    />
-                  )}
-                </div>
-              )}
-
-              {(form.sports.length > 0 || form.clubInterests.length > 0) && (
-                <div className="pt-3 border-t border-border">
-                  {form.sports.length > 0 && (
-                    <div className="mb-2">
-                      <p className="text-xs text-muted-foreground mb-1.5">Sports</p>
-                      <div className="flex flex-wrap gap-1">
-                        {form.sports.slice(0, 4).map((s) => (
-                          <span key={s} className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">
-                            {s}
-                          </span>
-                        ))}
-                        {form.sports.length > 4 && (
-                          <span className="text-xs text-muted-foreground px-1">
-                            +{form.sports.length - 4}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {form.clubInterests.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1.5">Clubs</p>
-                      <div className="flex flex-wrap gap-1">
-                        {form.clubInterests.slice(0, 3).map((c) => (
-                          <span key={c} className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded-full">
-                            {c}
-                          </span>
-                        ))}
-                        {form.clubInterests.length > 3 && (
-                          <span className="text-xs text-muted-foreground px-1">
-                            +{form.clubInterests.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Step hints */}
-            <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/15">
-              <p className="text-xs font-semibold text-primary mb-2">
-                {step === 1 && "Step 1 — Personal Details"}
-                {step === 2 && "Step 2 — Academic Info"}
-                {step === 3 && "Step 3 — Interests"}
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {step === 1 && "Fill in your personal details. Only Full Name is required. You can update these anytime."}
-                {step === 2 && "Your academic information helps generate personalised improvement suggestions and track your progress."}
-                {step === 3 && "Select your interests to help us recommend relevant clubs, sessions, and resources."}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-const INPUT =
-  "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition"
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-        active
-          ? "bg-primary text-primary-foreground border-primary"
-          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-      }`}
-    >
-      {active && (
-        <span className="mr-1">✓</span>
       )}
-      {label}
-    </button>
-  )
-}
 
-function PreviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex gap-2">
-      <span className="text-muted-foreground shrink-0 w-16 text-xs pt-0.5">{label}</span>
-      <span className="text-foreground text-xs break-words">{value}</span>
+      {/* ════════════════════════════════════════════ */}
+      {/* STEP 4 – Done                               */}
+      {/* ════════════════════════════════════════════ */}
+      {step === 4 && (
+        <div className="su-card">
+          <div className="su-banner" />
+          <div className="su-body">
+            <div className="su-done-ring">🎉</div>
+            <h2 className="su-done-title">Profile Complete!</h2>
+            <p className="su-done-sub">
+              Your EduCore student profile is all set. Here&apos;s a quick summary.
+            </p>
+
+            {/* Summary */}
+            <div className="su-summary">
+              {[
+                { ic: "👤", k: "Name",         v: user?.fullName },
+                { ic: "🎓", k: "Student ID",   v: user?.studentId },
+                { ic: "🏫", k: "Faculty",       v: user?.faculty },
+                { ic: "📱", k: "Phone",         v: user?.phone || "—" },
+                { ic: "⚧",  k: "Gender",        v: user?.gender || "—" },
+                { ic: "📸", k: "Photo",         v: user?.photoUrl ? "Uploaded ✓" : "Not uploaded" },
+              ].map((r) => (
+                <div key={r.k} className="su-sum-row">
+                  <span className="su-sum-ic">{r.ic}</span>
+                  <span className="su-sum-key">{r.k}</span>
+                  <span className="su-sum-val">{r.v}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* What's next */}
+            <p className="su-next-label">What&apos;s next?</p>
+            <div className="su-next-grid">
+              {[
+                { href: "/profile/academics", icon: "📚", bg: "oklch(0.92 0.06 250)", title: "Add Academics",   sub: "Semester GPA & subjects" },
+                { href: "/profile/clubs",     icon: "👥", bg: "oklch(0.93 0.05 295)", title: "Join Clubs",      sub: "Build society score" },
+                { href: "/profile/sports",    icon: "🏆", bg: "oklch(0.93 0.06 145)", title: "Log Sports",      sub: "Trophies & certificates" },
+                { href: "/dashboard",         icon: "🏠", bg: "oklch(0.93 0.03 220)", title: "Go to Dashboard", sub: "Explore all features" },
+              ].map((link) => (
+                <Link key={link.href} href={link.href} className="su-next-card" style={{ background: link.bg }}>
+                  <span className="su-next-icon">{link.icon}</span>
+                  <div className="su-next-title">{link.title}</div>
+                  <div className="su-next-sub">{link.sub}</div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="su-btn-row">
+              <Link href="/profile" style={{ textDecoration: "none", flex: 1 }}>
+                <button className="su-btn-primary" style={{ width: "100%" }}>
+                  View My Profile
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

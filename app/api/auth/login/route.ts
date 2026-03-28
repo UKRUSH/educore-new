@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import type { NextRequest } from "next/server"
 import { prisma } from "@/lib/db/prisma"
 import { verifyPassword, setSession } from "@/lib/auth/session"
