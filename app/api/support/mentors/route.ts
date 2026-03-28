@@ -36,6 +36,7 @@ export async function GET() {
 
   const result = mentors.map(m => ({
     id:                m.id,
+    userId:            m.userId,
     gpa:               m.gpa,
     subjects:          m.subjects,
     bio:               m.bio,

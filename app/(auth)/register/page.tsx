@@ -193,6 +193,19 @@ body { overflow: hidden; cursor: none; }
 .rc-strength { height: 2.5px; background: rgba(255,255,255,.1); border-radius: 999px; overflow: hidden; }
 .rc-strength-bar { height: 100%; border-radius: 999px; transition: width .35s, background .35s; }
 
+.rc-field-err {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: .7rem; color: oklch(0.72 0.18 20); margin-top: .1rem;
+  animation: shake .35s cubic-bezier(.36,.07,.19,.97);
+}
+.rc-input.invalid {
+  border-color: oklch(0.55 0.2 18) !important;
+  box-shadow: 0 0 0 3px oklch(0.55 0.2 18 / .15) !important;
+}
+.rc-input.valid {
+  border-color: oklch(0.52 0.18 145) !important;
+}
+
 /* submit */
 .rc-btn {
   width: 100%; padding: .875rem; border: none; border-radius: .875rem;
@@ -232,16 +245,68 @@ body { overflow: hidden; cursor: none; }
 }
 `
 
+const CY = new Date().getFullYear()
+
+function ErrMsg({ msg }: { msg: string }) {
+  return (
+    <span className="rc-field-err">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/>
+      </svg>
+      {msg}
+    </span>
+  )
+}
+
+function vFullName(v: string)   { if (!v.trim()) return "Full name is required."; if (v.trim().length < 2) return "Name must be at least 2 characters."; return "" }
+function vStudentId(v: string)  { if (!v.trim()) return "Student ID is required."; if (v.trim().length < 3) return "Enter a valid student ID."; return "" }
+function vEmail(v: string)      { if (!v.trim()) return "Email is required."; if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Enter a valid email address."; return "" }
+function vPassword(v: string)   { if (!v) return "Password is required."; if (v.length < 8) return "Password must be at least 8 characters."; return "" }
+function vConfirm(v: string, pw: string) { if (!v) return "Please confirm your password."; if (v !== pw) return "Passwords do not match."; return "" }
+function vFaculty(v: string)    { if (!v) return "Please select your faculty."; return "" }
+function vDegree(v: string)     { if (!v.trim()) return "Degree program is required."; return "" }
+function vYear(v: string)       { const n = Number(v); if (!v) return "Intake year is required."; if (isNaN(n) || n < 1990 || n > CY) return `Year must be between 1990 and ${CY}.`; return "" }
+
 export default function RegisterPage() {
   const router = useRouter()
-  const [showPw, setShowPw] = useState(false)
+
+  // Field values
+  const [fullName, setFullName]   = useState("")
+  const [studentId, setStudentId] = useState("")
+  const [email, setEmail]         = useState("")
+  const [pw, setPw]               = useState("")
+  const [cpw, setCpw]             = useState("")
+  const [faculty, setFaculty]     = useState("")
+  const [degree, setDegree]       = useState("")
+  const [intakeYear, setIntakeYear] = useState("")
+
+  // Touched flags — show error only after blur or submit attempt
+  const [touched, setTouched] = useState({
+    fullName: false, studentId: false, email: false,
+    pw: false, cpw: false, faculty: false, degree: false, intakeYear: false,
+  })
+
+  const touch = (f: keyof typeof touched) => setTouched(t => ({ ...t, [f]: true }))
+
+  // Computed errors (only shown when touched)
+  const errs = {
+    fullName:   touched.fullName   ? vFullName(fullName)        : "",
+    studentId:  touched.studentId  ? vStudentId(studentId)      : "",
+    email:      touched.email      ? vEmail(email)              : "",
+    pw:         touched.pw         ? vPassword(pw)              : "",
+    cpw:        touched.cpw        ? vConfirm(cpw, pw)          : "",
+    faculty:    touched.faculty    ? vFaculty(faculty)          : "",
+    degree:     touched.degree     ? vDegree(degree)            : "",
+    intakeYear: touched.intakeYear ? vYear(intakeYear)          : "",
+  }
+
+  const [showPw, setShowPw]   = useState(false)
   const [showCpw, setShowCpw] = useState(false)
-  const [error, setError] = useState("")
+  const [error, setError]     = useState("")
   const [pending, setPending] = useState(false)
-  const [pw, setPw] = useState("")
-  const [cursor, setCursor] = useState({ x: -100, y: -100 })
-  const ringRef = useRef({ x: -100, y: -100 })
-  const animRef = useRef<number>(0)
+  const [cursor, setCursor]   = useState({ x: -100, y: -100 })
+  const ringRef  = useRef({ x: -100, y: -100 })
+  const animRef  = useRef<number>(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const strength = pw.length === 0 ? 0 : pw.length < 5 ? 20 : pw.length < 8 ? 48 : pw.length < 12 ? 74 : 100
@@ -321,30 +386,19 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setError("")
-    const form = e.currentTarget
-    const get = (n: string) => (form.elements.namedItem(n) as HTMLInputElement | HTMLSelectElement).value
-    const fullName = get("fullName")
-    const email = get("email")
-    const studentId = get("studentId")
-    const password = get("password")
-    const confirmPassword = get("confirmPassword")
-    const faculty = get("faculty")
-    const degree = get("degree")
-    const intakeYear = Number(get("intakeYear"))
-
-    if (password !== confirmPassword) { setError("Passwords do not match."); return }
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return }
-    if (!faculty) { setError("Please select your faculty."); return }
-    const cy = new Date().getFullYear()
-    if (intakeYear < 1990 || intakeYear > cy) { setError(`Intake year must be between 1990 and ${cy}.`); return }
-
-    setPending(true)
+    // Touch all fields to reveal any hidden errors
+    setTouched({ fullName: true, studentId: true, email: true, pw: true, cpw: true, faculty: true, degree: true, intakeYear: true })
+    const hasError =
+      vFullName(fullName) || vStudentId(studentId) || vEmail(email) ||
+      vPassword(pw) || vConfirm(cpw, pw) || vFaculty(faculty) ||
+      vDegree(degree) || vYear(intakeYear)
+    if (hasError) return
+    setError(""); setPending(true)
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, studentId, password, faculty, degree, intakeYear }),
+        body: JSON.stringify({ fullName, email, studentId, password: pw, faculty, degree, intakeYear: Number(intakeYear) }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? "Registration failed. Please try again."); return }
@@ -406,21 +460,35 @@ export default function RegisterPage() {
 
         <form className="rc-form" onSubmit={handleSubmit} noValidate>
 
-          {/* Full Name + Email */}
+          {/* Full Name + Student ID */}
           <div className="rc-row2">
             <div className="rc-field">
               <label className="rc-label">Full Name</label>
               <div className="rc-input-wrap">
                 <span className="rc-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-                <input className="rc-input" type="text" name="fullName" placeholder="Ahmad bin Abdullah" autoComplete="name" required />
+                <input
+                  className={`rc-input${errs.fullName ? " invalid" : touched.fullName && !errs.fullName ? " valid" : ""}`}
+                  type="text" placeholder="Ahmad bin Abdullah" autoComplete="name"
+                  value={fullName}
+                  onChange={e => { setFullName(e.target.value); setError("") }}
+                  onBlur={() => touch("fullName")}
+                />
               </div>
+              {errs.fullName && <ErrMsg msg={errs.fullName} />}
             </div>
             <div className="rc-field">
               <label className="rc-label">Student ID</label>
               <div className="rc-input-wrap">
                 <span className="rc-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12z"/></svg></span>
-                <input className="rc-input" type="text" name="studentId" placeholder="S12345678" required />
+                <input
+                  className={`rc-input${errs.studentId ? " invalid" : touched.studentId && !errs.studentId ? " valid" : ""}`}
+                  type="text" placeholder="S12345678"
+                  value={studentId}
+                  onChange={e => { setStudentId(e.target.value); setError("") }}
+                  onBlur={() => touch("studentId")}
+                />
               </div>
+              {errs.studentId && <ErrMsg msg={errs.studentId} />}
             </div>
           </div>
 
@@ -429,8 +497,15 @@ export default function RegisterPage() {
             <label className="rc-label">University Email</label>
             <div className="rc-input-wrap">
               <span className="rc-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
-              <input className="rc-input" type="email" name="email" placeholder="student@university.edu.my" autoComplete="email" required />
+              <input
+                className={`rc-input${errs.email ? " invalid" : touched.email && !errs.email ? " valid" : ""}`}
+                type="email" placeholder="student@university.edu.my" autoComplete="email"
+                value={email}
+                onChange={e => { setEmail(e.target.value); setError("") }}
+                onBlur={() => touch("email")}
+              />
             </div>
+            {errs.email && <ErrMsg msg={errs.email} />}
           </div>
 
           {/* Password + Confirm */}
@@ -439,9 +514,13 @@ export default function RegisterPage() {
               <label className="rc-label">Password</label>
               <div className="rc-input-wrap">
                 <span className="rc-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-                <input className="rc-input" type={showPw ? "text" : "password"} name="password"
-                  placeholder="Min. 8 chars" autoComplete="new-password" required minLength={8}
-                  value={pw} onChange={e => setPw(e.target.value)} />
+                <input
+                  className={`rc-input${errs.pw ? " invalid" : touched.pw && !errs.pw ? " valid" : ""}`}
+                  type={showPw ? "text" : "password"} placeholder="Min. 8 chars" autoComplete="new-password"
+                  value={pw}
+                  onChange={e => { setPw(e.target.value); setError("") }}
+                  onBlur={() => touch("pw")}
+                />
                 <button type="button" className="rc-eye" onClick={() => setShowPw(v => !v)}>
                   {showPw
                     ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -450,13 +529,19 @@ export default function RegisterPage() {
                 </button>
               </div>
               {pw.length > 0 && <div className="rc-strength"><div className="rc-strength-bar" style={{ width: strength + "%", background: strengthColor }} /></div>}
+              {errs.pw && <ErrMsg msg={errs.pw} />}
             </div>
             <div className="rc-field">
               <label className="rc-label">Confirm Password</label>
               <div className="rc-input-wrap">
                 <span className="rc-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
-                <input className="rc-input" type={showCpw ? "text" : "password"} name="confirmPassword"
-                  placeholder="Re-enter password" autoComplete="new-password" required />
+                <input
+                  className={`rc-input${errs.cpw ? " invalid" : touched.cpw && !errs.cpw ? " valid" : ""}`}
+                  type={showCpw ? "text" : "password"} placeholder="Re-enter password" autoComplete="new-password"
+                  value={cpw}
+                  onChange={e => { setCpw(e.target.value); setError("") }}
+                  onBlur={() => touch("cpw")}
+                />
                 <button type="button" className="rc-eye" onClick={() => setShowCpw(v => !v)}>
                   {showCpw
                     ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -464,6 +549,7 @@ export default function RegisterPage() {
                   }
                 </button>
               </div>
+              {errs.cpw && <ErrMsg msg={errs.cpw} />}
             </div>
           </div>
 
@@ -472,11 +558,18 @@ export default function RegisterPage() {
             <label className="rc-label">Faculty</label>
             <div className="rc-input-wrap">
               <span className="rc-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span>
-              <select className="rc-input" name="faculty" required defaultValue="" style={{ appearance:"none" }}>
+              <select
+                className={`rc-input${errs.faculty ? " invalid" : touched.faculty && !errs.faculty ? " valid" : ""}`}
+                style={{ appearance: "none" }}
+                value={faculty}
+                onChange={e => { setFaculty(e.target.value); setError("") }}
+                onBlur={() => touch("faculty")}
+              >
                 <option value="" disabled>Select your faculty</option>
-                {FACULTIES.map(f => <option key={f} value={f} style={{ background:"#1a1f36", color:"#fff" }}>{f}</option>)}
+                {FACULTIES.map(f => <option key={f} value={f} style={{ background: "#1a1f36", color: "#fff" }}>{f}</option>)}
               </select>
             </div>
+            {errs.faculty && <ErrMsg msg={errs.faculty} />}
           </div>
 
           {/* Degree + Intake Year */}
@@ -484,15 +577,28 @@ export default function RegisterPage() {
             <div className="rc-field">
               <label className="rc-label">Degree Program</label>
               <div className="rc-input-wrap">
-                <input className="rc-input no-ico" type="text" name="degree" placeholder="e.g. B.Sc. Computer Science" required />
+                <input
+                  className={`rc-input no-ico${errs.degree ? " invalid" : touched.degree && !errs.degree ? " valid" : ""}`}
+                  type="text" placeholder="e.g. B.Sc. Computer Science"
+                  value={degree}
+                  onChange={e => { setDegree(e.target.value); setError("") }}
+                  onBlur={() => touch("degree")}
+                />
               </div>
+              {errs.degree && <ErrMsg msg={errs.degree} />}
             </div>
             <div className="rc-field">
               <label className="rc-label">Intake Year</label>
               <div className="rc-input-wrap">
-                <input className="rc-input no-ico" type="number" name="intakeYear"
-                  placeholder="e.g. 2022" required min={1990} max={new Date().getFullYear()} />
+                <input
+                  className={`rc-input no-ico${errs.intakeYear ? " invalid" : touched.intakeYear && !errs.intakeYear ? " valid" : ""}`}
+                  type="number" placeholder="e.g. 2022" min={1990} max={CY}
+                  value={intakeYear}
+                  onChange={e => { setIntakeYear(e.target.value); setError("") }}
+                  onBlur={() => touch("intakeYear")}
+                />
               </div>
+              {errs.intakeYear && <ErrMsg msg={errs.intakeYear} />}
             </div>
           </div>
 

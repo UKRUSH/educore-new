@@ -404,6 +404,11 @@ const CSS = `
 /* Spin */
 @keyframes spin { to { transform: rotate(360deg); } }
 .mt-spin { animation: spin .8s linear infinite; }
+
+/* Validation */
+.mt-field-err { font-size: .75rem; color: oklch(0.5 0.22 25); display: flex; align-items: center; gap: .3rem; margin-top: .1rem; }
+.mt-inp.invalid { border-color: oklch(0.6 0.22 25) !important; box-shadow: 0 0 0 3px oklch(0.6 0.22 25 / 0.1) !important; }
+.mt-inp.valid   { border-color: oklch(0.55 0.18 145); }
 `
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -420,9 +425,10 @@ export default function MaterialsPage() {
   const [matType, setMatType]           = useState("NOTES")
   const [description, setDescription]  = useState("")
   const [fileEntries, setFileEntries]   = useState<FileEntry[]>([])
-  const [uploading, setUploading]       = useState(false)
-  const [uploadError, setUploadError]   = useState("")
-  const [dragOver, setDragOver]         = useState(false)
+  const [uploading, setUploading]             = useState(false)
+  const [uploadError, setUploadError]         = useState("")
+  const [dragOver, setDragOver]               = useState(false)
+  const [courseCodeTouched, setCourseCodeTouched] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [expanded, setExpanded]                 = useState<number | null>(null)
@@ -463,9 +469,25 @@ export default function MaterialsPage() {
   function updateTitle(key: string, title: string) { setFileEntries((prev) => prev.map((e) => e.key === key ? { ...e, title } : e)) }
   function handleDrop(ev: React.DragEvent) { ev.preventDefault(); setDragOver(false); addFiles(ev.dataTransfer.files) }
 
+  function sanitizeCourseCode(raw: string) {
+    const letters = raw.slice(0, 2).replace(/[^a-zA-Z]/g, "").toUpperCase()
+    const digits  = raw.slice(letters.length === 2 ? 2 : letters.length, raw.length).replace(/[^0-9]/g, "")
+    return (letters + digits).slice(0, 6)
+  }
+  const COURSE_CODE_RE = /^[A-Z]{2}\d{4}$/
+  const courseCodeErr = courseCodeTouched
+    ? !courseCode.trim()
+      ? "Course code is required."
+      : !COURSE_CODE_RE.test(courseCode)
+      ? "Format must be 2 letters + 4 digits (e.g. CS2010)."
+      : ""
+    : ""
+
   // ── Upload ────────────────────────────────────────────────────────────────
   async function uploadAll() {
+    setCourseCodeTouched(true)
     if (!courseCode.trim()) { setUploadError("Course code is required."); return }
+    if (!COURSE_CODE_RE.test(courseCode)) { setUploadError("Course code must be 2 letters + 4 digits (e.g. CS2010)."); return }
     if (fileEntries.length === 0) { setUploadError("Add at least one file."); return }
     const oversized = fileEntries.find((e) => e.file.size > MAX_SIZE)
     if (oversized) { setUploadError(`"${oversized.file.name}" exceeds the 20 MB limit.`); return }
@@ -491,7 +513,7 @@ export default function MaterialsPage() {
 
   function closeUpload() {
     setShowUpload(false); setCourseCode(""); setMatType("NOTES")
-    setDescription(""); setFileEntries([]); setUploadError("")
+    setDescription(""); setFileEntries([]); setUploadError(""); setCourseCodeTouched(false)
   }
 
   // ── Summarize ─────────────────────────────────────────────────────────────
@@ -639,8 +661,21 @@ export default function MaterialsPage() {
               <div className="mt-grid-2">
                 <div className="mt-field">
                   <label className="mt-lbl">Course Code <span className="mt-lbl-req">*</span></label>
-                  <input className="mt-inp" placeholder="e.g. CS2010" value={courseCode}
-                    onChange={(e) => setCourseCode(e.target.value)} disabled={uploading} />
+                  <input
+                    className={`mt-inp${courseCodeErr ? " invalid" : courseCodeTouched && courseCode.trim() ? " valid" : ""}`}
+                    placeholder="e.g. CS2010"
+                    value={courseCode}
+                    onChange={(e) => { setCourseCode(sanitizeCourseCode(e.target.value)); setUploadError("") }}
+                    maxLength={6}
+                    onBlur={() => setCourseCodeTouched(true)}
+                    disabled={uploading}
+                  />
+                  {courseCodeErr && (
+                    <span className="mt-field-err">
+                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      {courseCodeErr}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-field">
                   <label className="mt-lbl">Type</label>

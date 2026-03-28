@@ -171,6 +171,18 @@ body { overflow: hidden; cursor: none; }
   0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)}
   40%{transform:translateX(5px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)}
 }
+.lc-field-err {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: .72rem; color: oklch(0.72 0.18 20); margin-top: .1rem;
+  animation: shake .35s cubic-bezier(.36,.07,.19,.97);
+}
+.lc-input.invalid {
+  border-color: oklch(0.55 0.2 18);
+  box-shadow: 0 0 0 3px oklch(0.55 0.2 18 / .15);
+}
+.lc-input.valid {
+  border-color: oklch(0.55 0.18 145 / .7);
+}
 
 /* form */
 .lc-form { display: flex; flex-direction: column; gap: .9rem; }
@@ -293,6 +305,17 @@ body { overflow: hidden; cursor: none; }
 }
 `
 
+function validateEmail(v: string) {
+  if (!v.trim()) return "Email is required."
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Enter a valid email address."
+  return ""
+}
+function validatePassword(v: string) {
+  if (!v) return "Password is required."
+  if (v.length < 6) return "Password must be at least 6 characters."
+  return ""
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [showPw, setShowPw] = useState(false)
@@ -301,11 +324,15 @@ export default function LoginPage() {
   const [pending, setPending] = useState(false)
   const [email, setEmail] = useState("")
   const [pw, setPw] = useState("")
+  const [touched, setTouched] = useState({ email: false, password: false })
   const [cursor, setCursor] = useState({ x: -100, y: -100 })
   const [ring, setRing] = useState({ x: -100, y: -100 })
   const ringRef = useRef({ x: -100, y: -100 })
   const animRef = useRef<number>(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  const emailErr = touched.email ? validateEmail(email) : ""
+  const pwErr    = touched.password ? validatePassword(pw) : ""
 
   const strength = pw.length === 0 ? 0 : pw.length < 5 ? 20 : pw.length < 8 ? 48 : pw.length < 12 ? 74 : 100
   const strengthColor = strength < 30 ? "oklch(0.6 0.22 18)" : strength < 65 ? "oklch(0.72 0.17 65)" : "oklch(0.65 0.22 145)"
@@ -385,6 +412,11 @@ export default function LoginPage() {
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    // Touch all fields so errors show
+    setTouched({ email: true, password: true })
+    const eErr = validateEmail(email)
+    const pErr = validatePassword(pw)
+    if (eErr || pErr) return
     setError(""); setPending(true)
     try {
       const res = await fetch("/api/auth/login", {
@@ -466,11 +498,24 @@ export default function LoginPage() {
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
                 </svg>
               </span>
-              <input className="lc-input" type="email" name="email"
+              <input
+                className={`lc-input${emailErr ? " invalid" : touched.email && !emailErr ? " valid" : ""}`}
+                type="email" name="email"
                 placeholder="you@university.edu.my"
-                autoComplete="email" required
-                value={email} onChange={e => setEmail(e.target.value)} />
+                autoComplete="email"
+                value={email}
+                onChange={e => { setEmail(e.target.value); setError("") }}
+                onBlur={() => setTouched(t => ({ ...t, email: true }))}
+              />
             </div>
+            {emailErr && (
+              <span className="lc-field-err">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/>
+                </svg>
+                {emailErr}
+              </span>
+            )}
           </div>
 
           {/* Password */}
@@ -482,11 +527,15 @@ export default function LoginPage() {
                   <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </span>
-              <input className="lc-input"
+              <input
+                className={`lc-input${pwErr ? " invalid" : touched.password && !pwErr ? " valid" : ""}`}
                 type={showPw ? "text" : "password"} name="password"
                 placeholder="••••••••"
-                autoComplete="current-password" required minLength={6}
-                value={pw} onChange={e => setPw(e.target.value)} />
+                autoComplete="current-password"
+                value={pw}
+                onChange={e => { setPw(e.target.value); setError("") }}
+                onBlur={() => setTouched(t => ({ ...t, password: true }))}
+              />
               <button type="button" className="lc-eye" onClick={() => setShowPw(v => !v)}>
                 {showPw
                   ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -498,6 +547,14 @@ export default function LoginPage() {
               <div className="lc-strack">
                 <div className="lc-sfill" style={{ width: strength + "%", background: strengthColor }} />
               </div>
+            )}
+            {pwErr && (
+              <span className="lc-field-err">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/>
+                </svg>
+                {pwErr}
+              </span>
             )}
           </div>
 

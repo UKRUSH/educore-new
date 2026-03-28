@@ -262,6 +262,17 @@ const CSS = `
   border-radius: .65rem; padding: .75rem 1rem; font-size: .82rem;
   color: oklch(0.5 0.22 25); margin-top: .85rem;
 }
+.su-field-err {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: .72rem; color: oklch(0.5 0.22 25); margin-top: .15rem;
+}
+.su-inp.invalid {
+  border-color: oklch(0.6 0.2 25) !important;
+  box-shadow: 0 0 0 3px oklch(0.6 0.2 25 / .12) !important;
+}
+.su-inp.valid {
+  border-color: oklch(0.52 0.18 145) !important;
+}
 
 /* ── Skeleton ── */
 .su-skel { background: var(--muted); border-radius: .75rem; animation: suSkel 1.4s ease-in-out infinite; }
@@ -283,8 +294,34 @@ export default function ProfileSetupPage() {
 
   // Details
   const [form, setForm] = useState({ fullName: "", phone: "", dateOfBirth: "", gender: "" })
+  const [detailTouched, setDetailTouched] = useState({ phone: false, dateOfBirth: false })
   const [saving, setSaving] = useState(false)
   const [saveErr, setSaveErr] = useState("")
+
+  const TODAY = new Date().toISOString().split("T")[0]
+
+  function validatePhone(v: string) {
+    if (!v.trim()) return "" // optional field
+    if (v.length !== 10) return "Phone number must be exactly 10 digits."
+    if (!/^0[1-9]\d{8}$/.test(v)) return "Enter a valid Sri Lanka number (e.g. 0712345678)."
+    return ""
+  }
+
+  function validateDOB(v: string) {
+    if (!v) return "" // optional
+    if (v > TODAY) return "Date of birth cannot be in the future."
+    const dob = new Date(v)
+    const minAge = new Date()
+    minAge.setFullYear(minAge.getFullYear() - 15)
+    if (dob > minAge) return "You must be at least 15 years old."
+    const maxAge = new Date()
+    maxAge.setFullYear(maxAge.getFullYear() - 100)
+    if (dob < maxAge) return "Please enter a valid date of birth."
+    return ""
+  }
+
+  const phoneErr = detailTouched.phone       ? validatePhone(form.phone)       : ""
+  const dobErr   = detailTouched.dateOfBirth ? validateDOB(form.dateOfBirth)   : ""
 
   useEffect(() => {
     fetch("/api/profile/me")
@@ -351,6 +388,9 @@ export default function ProfileSetupPage() {
 
   async function saveDetails() {
     if (!form.fullName.trim()) { setSaveErr("Full name is required."); return }
+    // Touch both fields to reveal any hidden errors
+    setDetailTouched({ phone: true, dateOfBirth: true })
+    if (validatePhone(form.phone) || validateDOB(form.dateOfBirth)) return
     setSaving(true); setSaveErr("")
     try {
       const res = await fetch("/api/profile/me", {
@@ -579,8 +619,27 @@ export default function ProfileSetupPage() {
               <div className="su-row">
                 <div className="su-field">
                   <label className="su-lbl">Phone Number</label>
-                  <input className="su-inp" placeholder="+60123456789"
-                    value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
+                  <input
+                    className={`su-inp${phoneErr ? " invalid" : detailTouched.phone && form.phone && !phoneErr ? " valid" : ""}`}
+                    placeholder="0712345678"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={form.phone}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 10)
+                      setForm((p) => ({ ...p, phone: digits }))
+                    }}
+                    onBlur={() => setDetailTouched((t) => ({ ...t, phone: true }))}
+                  />
+                  {phoneErr && (
+                    <span className="su-field-err">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/>
+                      </svg>
+                      {phoneErr}
+                    </span>
+                  )}
                 </div>
                 <div className="su-field">
                   <label className="su-lbl">Gender</label>
@@ -594,10 +653,23 @@ export default function ProfileSetupPage() {
 
               <div className="su-field">
                 <label className="su-lbl">Date of Birth</label>
-                <input className="su-inp" type="date"
+                <input
+                  className={`su-inp${dobErr ? " invalid" : detailTouched.dateOfBirth && form.dateOfBirth && !dobErr ? " valid" : ""}`}
+                  type="date"
                   value={form.dateOfBirth}
-                  max={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => setForm((p) => ({ ...p, dateOfBirth: e.target.value }))} />
+                  max={TODAY}
+                  min={(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 100); return d.toISOString().split("T")[0] })()}
+                  onChange={(e) => setForm((p) => ({ ...p, dateOfBirth: e.target.value }))}
+                  onBlur={() => setDetailTouched((t) => ({ ...t, dateOfBirth: true }))}
+                />
+                {dobErr && (
+                  <span className="su-field-err">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/>
+                    </svg>
+                    {dobErr}
+                  </span>
+                )}
               </div>
 
               {/* Read-only academic info */}

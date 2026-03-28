@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic"
-
 import { useState, useEffect, useRef } from "react";
 
 /* ─────────────────────────────────────────────
@@ -11,9 +9,6 @@ import { useState, useEffect, useRef } from "react";
 ───────────────────────────────────────────── */
 
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Sora:wght@300;400;600;700;800&display=swap');
-@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,700,500&display=swap');
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -41,28 +36,8 @@ body {
   color: var(--fg);
   font-family: var(--font-body);
   overflow-x: hidden;
-  cursor: none;
 }
 
-/* ── Custom cursor ── */
-#cursor {
-  position: fixed; width: 12px; height: 12px; border-radius: 50%;
-  background: var(--primary); pointer-events: none; z-index: 9999;
-  transform: translate(-50%,-50%);
-  transition: width .2s, height .2s, opacity .2s;
-  mix-blend-mode: multiply;
-}
-#cursor-ring {
-  position: fixed; width: 36px; height: 36px; border-radius: 50%;
-  border: 1.5px solid oklch(0.6231 0.1880 259.8145 / 0.4);
-  pointer-events: none; z-index: 9998;
-  transform: translate(-50%,-50%);
-  transition: transform .12s ease-out, width .2s, height .2s, border-color .2s;
-  display: none;
-}
-html.dark #cursor-ring { display: block; }
-body:has(a:hover) #cursor { width:20px; height:20px; opacity:.7; }
-body:has(button:hover) #cursor { width:20px; height:20px; opacity:.7; }
 
 /* ── Noise overlay ── */
 .noise::after {
@@ -616,7 +591,6 @@ html.dark .cta-section {
 html.dark .process-num { color: oklch(0.26 0 0); }
 html.dark .badge-open { background: oklch(0.35 0.12 145); color: oklch(0.75 0.18 145); }
 html.dark .badge-pend { background: oklch(0.35 0.1 75);  color: oklch(0.78 0.15 75); }
-html.dark #cursor { mix-blend-mode: screen; }
 
 /* ── Theme toggle button ── */
 .theme-toggle {
@@ -752,32 +726,7 @@ export default function EduCoreLandingV2() {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
-  const [cursor, setCursor] = useState({ x: -100, y: -100 });
-  const [ring, setRing] = useState({ x: -100, y: -100 });
-  const ringRef = useRef({ x: -100, y: -100 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>(0);
-
-  /* cursor follow */
-  useEffect(() => {
-    const move = (e: MouseEvent) => {
-      setCursor({ x: e.clientX, y: e.clientY });
-    };
-    window.addEventListener("mousemove", move);
-    return () => window.removeEventListener("mousemove", move);
-  }, []);
-
-  useEffect(() => {
-    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-    const tick = () => {
-      ringRef.current.x = lerp(ringRef.current.x, cursor.x, 0.1);
-      ringRef.current.y = lerp(ringRef.current.y, cursor.y, 0.1);
-      setRing({ ...ringRef.current });
-      animRef.current = requestAnimationFrame(tick);
-    };
-    animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [cursor]);
 
   /* scroll */
   useEffect(() => {
@@ -830,8 +779,8 @@ export default function EduCoreLandingV2() {
     hero.addEventListener("mousemove", onMove);
     hero.addEventListener("mouseleave", onLeave);
 
-    const N = 110;
-    const LINK  = 130;
+    const N = 55;
+    const LINK  = 120;
     const REPEL = 90;
     const FORCE = 0.018;
 
@@ -864,19 +813,10 @@ export default function EduCoreLandingV2() {
         if (p.y < 0)  { p.y = 0;  p.vy =  Math.abs(p.vy); }
         if (p.y > h)  { p.y = h;  p.vy = -Math.abs(p.vy); }
 
-        /* glow halo */
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 5);
-        g.addColorStop(0, "rgba(99,130,255,0.40)");
-        g.addColorStop(1, "rgba(99,130,255,0)");
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 5, 0, Math.PI * 2);
-        ctx.fillStyle = g;
-        ctx.fill();
-
         /* crisp dot */
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(99,130,255,0.8)";
+        ctx.fillStyle = "rgba(99,130,255,0.75)";
         ctx.fill();
       });
 
@@ -912,9 +852,6 @@ export default function EduCoreLandingV2() {
     <div className="noise" style={{ minHeight: "100vh" }}>
       <style>{CSS}</style>
 
-      {/* Custom cursor */}
-      <div id="cursor" style={{ left: cursor.x, top: cursor.y }} />
-      <div id="cursor-ring" style={{ left: ring.x, top: ring.y }} />
 
       {/* ── NAVBAR ── */}
       <nav className={`navbar ${scrolled ? "scrolled" : ""}`}>

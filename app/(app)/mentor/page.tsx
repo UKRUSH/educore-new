@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic"
 
 import { useState, useEffect } from "react"
+import ChatModal from "@/components/ChatModal"
 
 type MentorProfile = {
   id: number
@@ -17,6 +18,7 @@ type MentorProfile = {
 }
 
 type UserInfo = {
+  id: number
   fullName: string
   studentId: string
   faculty: string
@@ -494,6 +496,7 @@ export default function MentorProfilePage() {
   const [sessFieldErr, setSessFieldErr] = useState<Record<string, string>>({})
   const [sessSaving, setSessSaving]     = useState(false)
   const [expandedSession, setExpandedSession] = useState<number | null>(null)
+  const [chatWith, setChatWith] = useState<{ userId: number; name: string } | null>(null)
 
   const selectedDays = form.preferredDays
     ? form.preferredDays.split(",").map(d => d.trim()).filter(Boolean)
@@ -846,6 +849,18 @@ export default function MentorProfilePage() {
                                         <div className="mp-student-meta">{st.degree} · {st.faculty}</div>
                                       </div>
                                       <span className="mp-student-sid">{st.studentId}</span>
+                                      <button
+                                        style={{
+                                          marginLeft: ".5rem", flexShrink: 0,
+                                          padding: ".3rem .75rem", border: "1.5px solid oklch(0.6231 0.1880 259.8145 / .5)",
+                                          borderRadius: ".6rem", background: "oklch(0.93 0.05 268 / .7)",
+                                          color: "oklch(0.4882 0.2172 264.3763)", fontSize: ".75rem", fontWeight: 700,
+                                          cursor: "pointer", transition: "background .15s",
+                                        }}
+                                        onClick={() => setChatWith({ userId: st.id, name: st.fullName })}
+                                      >
+                                        💬 Chat
+                                      </button>
                                     </div>
                                   ))
                                 )}
@@ -1137,6 +1152,16 @@ export default function MentorProfilePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Chat modal */}
+      {chatWith && userInfo && (
+        <ChatModal
+          toUserId={chatWith.userId}
+          toUserName={chatWith.name}
+          currentUserId={userInfo.id}
+          onClose={() => setChatWith(null)}
+        />
       )}
     </>
   )
