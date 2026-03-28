@@ -375,11 +375,11 @@ export default function AcademicPage() {
     const ca  = subjForm.caMarks    !== "" ? Number(subjForm.caMarks)    : null
     const fin = subjForm.finalMarks !== "" ? Number(subjForm.finalMarks) : null
 
-    if (ca !== null && (isNaN(ca) || ca < 0 || ca > 100))
-      errs.caMarks = "CA marks must be 0 – 100."
+    if (ca !== null && (isNaN(ca) || ca < 1 || ca > 100))
+      errs.caMarks = "CA marks must be 1 – 100."
 
-    if (fin !== null && (isNaN(fin) || fin < 0 || fin > 100))
-      errs.finalMarks = "Final marks must be 0 – 100."
+    if (fin !== null && (isNaN(fin) || fin < 1 || fin > 100))
+      errs.finalMarks = "Final marks must be 1 – 100."
 
     const marks = Number(subjForm.marks)
     if (subjForm.marks === "" || isNaN(marks))
@@ -428,6 +428,15 @@ export default function AcademicPage() {
   // ── Form change: auto-calc Overall = CA + Final, clear field errors ──────────
 
   function handleSubjFormChange(field: keyof typeof subjForm, value: string) {
+    // Clamp CA Marks and Final Exam: integers only, 1–100
+    if ((field === "caMarks" || field === "finalMarks") && value !== "") {
+      const n = Math.round(parseFloat(value))
+      if (isNaN(n)) value = ""
+      else if (n > 100) value = "100"
+      else if (n < 1) value = "1"
+      else value = String(n)
+    }
+
     // Clear the error for this field on change
     if (subjFieldErrors[field]) {
       setSubjFieldErrors(prev => { const n = { ...prev }; delete n[field]; return n })
@@ -795,9 +804,9 @@ export default function AcademicPage() {
                   {/* Marks row: CA + Final + Overall */}
                   <div className="ah-modal-row3">
                     <div className="ah-field">
-                      <label>CA Marks (0–100)</label>
+                      <label>CA Marks (1–100)</label>
                       <input className={`ah-input${subjFieldErrors.caMarks ? " err" : ""}`}
-                        type="number" min={0} max={100} step={0.1} value={subjForm.caMarks}
+                        type="number" min={1} max={100} step={1} value={subjForm.caMarks}
                         onChange={e => handleSubjFormChange("caMarks", e.target.value)}
                         placeholder="e.g. 35" />
                       {subjFieldErrors.caMarks && (
@@ -808,9 +817,9 @@ export default function AcademicPage() {
                       )}
                     </div>
                     <div className="ah-field">
-                      <label>Final Exam (0–100)</label>
+                      <label>Final Exam (1–100)</label>
                       <input className={`ah-input${subjFieldErrors.finalMarks ? " err" : ""}`}
-                        type="number" min={0} max={100} step={0.1} value={subjForm.finalMarks}
+                        type="number" min={1} max={100} step={1} value={subjForm.finalMarks}
                         onChange={e => handleSubjFormChange("finalMarks", e.target.value)}
                         placeholder="e.g. 45" />
                       {subjFieldErrors.finalMarks && (

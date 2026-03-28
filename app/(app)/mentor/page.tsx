@@ -280,6 +280,11 @@ const CSS = `
   color: #fff; box-shadow: 0 2px 8px oklch(0.4882 0.2172 264.3763 / .3);
 }
 .mp-btn-sm-blue:hover { opacity: .88; transform: translateY(-1px); }
+.mp-btn-sm-green {
+  background: linear-gradient(135deg, oklch(0.45 0.18 145), oklch(0.58 0.16 145));
+  color: #fff; box-shadow: 0 2px 8px oklch(0.45 0.18 145 / .35);
+}
+.mp-btn-sm-green:hover { opacity: .88; transform: translateY(-1px); }
 .mp-btn-sm-muted {
   background: var(--muted); border: 1.5px solid var(--border); color: var(--foreground);
 }
@@ -301,43 +306,75 @@ const CSS = `
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
 }
 .mp-sess-title { font-size: .98rem; font-weight: 800; color: var(--foreground); display: flex; align-items: center; gap: .5rem; }
-.mp-sess-list { display: flex; flex-direction: column; gap: 0; }
+.mp-sess-list { display: flex; flex-direction: column; gap: .1rem; padding-bottom: .75rem; }
 .mp-sess-empty {
-  padding: 2.5rem; text-align: center;
+  padding: 3rem; text-align: center;
   color: var(--muted-foreground); font-size: .85rem;
 }
-.mp-sess-item {
-  padding: 1.1rem 1.75rem; border-bottom: 1px solid var(--border);
+
+/* Card wrapper */
+.mp-sess-card {
+  margin: .75rem 1.5rem;
+  border-radius: 1rem;
+  border: 1.5px solid var(--border);
+  background: var(--background);
+  box-shadow: 0 1px 6px oklch(0 0 0 / .05);
+  overflow: hidden;
+  transition: box-shadow .18s, border-color .18s;
+}
+.mp-sess-card:hover { box-shadow: 0 4px 18px oklch(0.4882 0.2172 264.3763 / .1); border-color: oklch(0.6231 0.1880 259.8145 / .35); }
+
+/* Top info area */
+.mp-sess-top {
   display: flex; align-items: flex-start; gap: 1rem;
+  padding: 1.1rem 1.25rem 1rem;
 }
-.mp-sess-item:last-child { border-bottom: none; }
 .mp-sess-date-box {
-  flex-shrink: 0; width: 52px; display: flex; flex-direction: column; align-items: center;
-  padding: .5rem .4rem; border-radius: .75rem;
-  background: oklch(0.6231 0.1880 259.8145 / .1); border: 1.5px solid oklch(0.6231 0.1880 259.8145 / .25);
+  flex-shrink: 0; width: 58px; display: flex; flex-direction: column; align-items: center;
+  padding: .6rem .4rem; border-radius: .85rem;
+  background: linear-gradient(160deg, oklch(0.6231 0.1880 259.8145 / .12), oklch(0.4882 0.2172 264.3763 / .08));
+  border: 1.5px solid oklch(0.6231 0.1880 259.8145 / .3);
 }
-.mp-sess-month { font-size: .6rem; font-weight: 700; color: oklch(0.55 0.18 259); text-transform: uppercase; letter-spacing: .06em; }
-.mp-sess-day   { font-size: 1.35rem; font-weight: 900; color: oklch(0.4882 0.2172 264.3763); line-height: 1; }
-.mp-sess-year  { font-size: .58rem; color: var(--muted-foreground); font-weight: 600; }
-.mp-sess-body  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .3rem; }
-.mp-sess-subj  { font-size: .9rem; font-weight: 800; color: var(--foreground); }
-.mp-sess-desc  { font-size: .78rem; color: var(--muted-foreground); }
-.mp-sess-meta  { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .3rem; }
+.mp-sess-month { font-size: .62rem; font-weight: 800; color: oklch(0.55 0.18 259); text-transform: uppercase; letter-spacing: .08em; }
+.mp-sess-day   { font-size: 1.6rem; font-weight: 900; color: oklch(0.4882 0.2172 264.3763); line-height: 1.05; }
+.mp-sess-year  { font-size: .6rem; color: var(--muted-foreground); font-weight: 600; }
+.mp-sess-body  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .45rem; }
+
+/* Title row */
+.mp-sess-title-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.mp-sess-subj  { font-size: 1rem; font-weight: 800; color: var(--foreground); }
+.mp-sess-desc  { font-size: .8rem; color: var(--muted-foreground); line-height: 1.4; }
+
+/* Meta chips */
+.mp-sess-meta  { display: flex; flex-wrap: wrap; gap: .4rem; }
 .mp-sess-tag {
-  display: inline-flex; align-items: center; gap: .25rem;
-  padding: .2rem .6rem; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: .28rem;
+  padding: .3rem .75rem; border-radius: .5rem;
   background: var(--muted); border: 1px solid var(--border);
-  font-size: .7rem; font-weight: 600; color: var(--muted-foreground);
+  font-size: .76rem; font-weight: 600; color: var(--foreground);
 }
-.mp-sess-actions { display: flex; gap: .4rem; align-items: center; flex-shrink: 0; }
+.mp-sess-tag-link {
+  background: oklch(0.93 0.05 259 / .4); border-color: oklch(0.78 0.12 259 / .35);
+  color: oklch(0.42 0.18 259);
+}
+
+/* Status pill */
 .mp-status-pill {
-  display: inline-flex; align-items: center; gap: .3rem;
-  padding: .25rem .7rem; border-radius: 999px; font-size: .7rem; font-weight: 700;
+  display: inline-flex; align-items: center; gap: .28rem;
+  padding: .28rem .75rem; border-radius: .5rem; font-size: .72rem; font-weight: 700;
 }
-.mp-pill-upcoming  { background: oklch(0.92 0.07 259 / .5); color: oklch(0.42 0.18 259); border: 1px solid oklch(0.78 0.12 259 / .4); }
-.mp-pill-ongoing   { background: oklch(0.92 0.08 145 / .5); color: oklch(0.38 0.18 145); border: 1px solid oklch(0.78 0.12 145 / .4); }
+.mp-pill-upcoming  { background: oklch(0.92 0.07 259 / .5); color: oklch(0.38 0.2 259); border: 1px solid oklch(0.78 0.12 259 / .4); }
+.mp-pill-ongoing   { background: oklch(0.92 0.08 145 / .5); color: oklch(0.35 0.18 145); border: 1px solid oklch(0.72 0.14 145 / .4); }
 .mp-pill-completed { background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border); }
 .mp-pill-cancelled { background: oklch(0.95 0.04 27 / .5); color: oklch(0.45 0.18 27); border: 1px solid oklch(0.75 0.12 27 / .4); }
+
+/* Actions bar */
+.mp-sess-actions {
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  padding: .75rem 1.25rem;
+  background: var(--muted); border-top: 1px solid var(--border);
+}
+.mp-sess-actions-spacer { flex: 1; }
 
 /* Create session modal overlay */
 .mp-modal-overlay {
@@ -483,7 +520,7 @@ export default function MentorProfilePage() {
     subjects: "",
     bio: "",
     preferredDays: "",
-    contactPreference: "EMAIL",
+    contactPreference: "CHAT",
   })
 
   // sessions
@@ -775,51 +812,67 @@ export default function MentorProfilePage() {
                       const d = fmtDate(s.date)
                       const isPast = new Date(s.date) < new Date()
                       return (
-                        <div key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                          {/* Main row */}
-                          <div className="mp-sess-item" style={{ borderBottom: "none" }}>
+                        <div key={s.id} className="mp-sess-card">
+                          {/* Top: date + info */}
+                          <div className="mp-sess-top">
                             <div className="mp-sess-date-box">
                               <span className="mp-sess-month">{d.month}</span>
                               <span className="mp-sess-day">{d.day}</span>
                               <span className="mp-sess-year">{d.year}</span>
                             </div>
                             <div className="mp-sess-body">
-                              <div className="mp-sess-subj">{s.subject}</div>
-                              {s.description && <div className="mp-sess-desc">{s.description}</div>}
-                              <div className="mp-sess-meta">
-                                <span className="mp-sess-tag">🕐 {d.time}</span>
-                                <span className="mp-sess-tag">⏱ {s.durationMins} min</span>
-                                {s.locationOrLink && <span className="mp-sess-tag">🔗 Session Link</span>}
+                              <div className="mp-sess-title-row">
+                                <span className="mp-sess-subj">{s.subject}</span>
                                 <span className={`mp-status-pill ${STATUS_PILL[s.status]}`}>
                                   {STATUS_DOT[s.status]} {s.status}
                                 </span>
                               </div>
+                              {s.description && <div className="mp-sess-desc">{s.description}</div>}
+                              <div className="mp-sess-meta">
+                                <span className="mp-sess-tag">🕐 {d.time}</span>
+                                <span className="mp-sess-tag">⏱ {s.durationMins} min</span>
+                                <span className="mp-sess-tag">👥 {s.enrolled} / {s.capacity} seats</span>
+                                {s.locationOrLink && (
+                                  <span className="mp-sess-tag mp-sess-tag-link">🔗 Online Session</span>
+                                )}
+                              </div>
                             </div>
-                            <div className="mp-sess-actions">
-                              {/* Students toggle */}
-                              <button
-                                className={`mp-students-toggle${expandedSession === s.id ? " open" : ""}`}
-                                onClick={() => setExpandedSession(expandedSession === s.id ? null : s.id)}
+                          </div>
+
+                          {/* Actions bar */}
+                          <div className="mp-sess-actions">
+                            <button
+                              className={`mp-students-toggle${expandedSession === s.id ? " open" : ""}`}
+                              onClick={() => setExpandedSession(expandedSession === s.id ? null : s.id)}
+                            >
+                              👥 Students ({s.enrolled})
+                              <span style={{ marginLeft: ".25rem" }}>{expandedSession === s.id ? "▲" : "▼"}</span>
+                            </button>
+                            <div className="mp-sess-actions-spacer" />
+                            {(s.status === "UPCOMING" || s.status === "ONGOING") && s.locationOrLink && (
+                              <a
+                                className="mp-btn-sm mp-btn-sm-green"
+                                href={s.locationOrLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ textDecoration: "none" }}
                               >
-                                👥
-                                <span className="mp-enroll-count">{s.enrolled}</span>
-                                / {s.capacity}
-                                <span style={{ marginLeft: ".2rem" }}>{expandedSession === s.id ? "▲" : "▼"}</span>
-                              </button>
-                              {s.status === "UPCOMING" && !isPast && (
-                                <>
-                                  <button className="mp-btn-sm mp-btn-sm-muted" onClick={() => openEditModal(s)}>
-                                    ✏️ Edit
-                                  </button>
-                                  <button className="mp-btn-sm mp-btn-sm-red" onClick={() => cancelSession(s.id)}>
-                                    Cancel
-                                  </button>
-                                </>
-                              )}
-                              <button className="mp-btn-sm mp-btn-sm-delete" onClick={() => deleteSession(s.id)}>
-                                🗑 Delete
-                              </button>
-                            </div>
+                                🎥 Join as Host
+                              </a>
+                            )}
+                            {s.status === "UPCOMING" && !isPast && (
+                              <>
+                                <button className="mp-btn-sm mp-btn-sm-muted" onClick={() => openEditModal(s)}>
+                                  ✏️ Edit
+                                </button>
+                                <button className="mp-btn-sm mp-btn-sm-red" onClick={() => cancelSession(s.id)}>
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                            <button className="mp-btn-sm mp-btn-sm-delete" onClick={() => deleteSession(s.id)}>
+                              🗑 Delete
+                            </button>
                           </div>
 
                           {/* Enrolled students panel */}
@@ -975,27 +1028,6 @@ export default function MentorProfilePage() {
                         <span className="mp-hint">Click to select the days you&apos;re available for mentoring sessions.</span>
                       </div>
 
-                      <div className="mp-field">
-                        <label className="mp-label">How should students contact you?</label>
-                        <div className="mp-contact-grid">
-                          {CONTACT_OPTS.map(opt => (
-                            <div
-                              key={opt.value}
-                              className={`mp-contact-opt${form.contactPreference === opt.value ? " active" : ""}`}
-                              onClick={() => setForm(f => ({ ...f, contactPreference: opt.value }))}
-                            >
-                              <div className="mp-contact-radio">
-                                {form.contactPreference === opt.value && <div className="mp-contact-dot" />}
-                              </div>
-                              <span style={{ fontSize: "1.1rem" }}>{opt.icon}</span>
-                              <div className="mp-contact-label">
-                                <span className="mp-contact-title">{opt.title}</span>
-                                <span className="mp-contact-sub">{opt.sub}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
