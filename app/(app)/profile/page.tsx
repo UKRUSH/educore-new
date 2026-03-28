@@ -65,14 +65,34 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login")
 
-  const avgGpa = semesters.length > 0
-    ? semesters.reduce((sum, s) => sum + (s.gpa ?? 0), 0) / semesters.length : 0
+  const GP: Record<string, number> = {
+    "A+": 4.0, "A": 4.0, "A-": 3.7,
+    "B+": 3.3, "B": 3.0, "B-": 2.7,
+    "C+": 2.3, "C": 2.0, "C-": 1.7,
+    "D": 1.0, "F": 0.0,
+  }
+  const allSubjects = semesters.flatMap(s => s.subjects)
+  const cgpa = allSubjects.length > 0
+    ? allSubjects.reduce((sum, s) => sum + (GP[s.grade] ?? 0) * s.credits, 0) /
+      allSubjects.reduce((sum, s) => sum + s.credits, 0)
+    : semesters.length > 0
+      ? semesters.filter(s => s.gpa !== null).reduce((sum, s) => sum + (s.gpa ?? 0), 0) /
+        Math.max(1, semesters.filter(s => s.gpa !== null).length)
+      : 0
+  const avgGpa = cgpa
   const academicScore = Math.min(Math.round((avgGpa / 4.0) * 100), 100)
   const sportsScore   = Math.min(sports.reduce((sum, s) => sum + s.points, 0), 100)
   const societyScore  = Math.min(clubs.reduce((sum, c) => sum + c.participationPoints, 0), 100)
   const overallScore  = Math.round(academicScore * 0.5 + sportsScore * 0.25 + societyScore * 0.25)
 
   const latestSemester = semesters[0] ?? null
+  // Calculate latest semester GPA from subjects; fall back to stored gpa field
+  const latestSemGpa = latestSemester
+    ? (latestSemester.subjects.length > 0
+        ? latestSemester.subjects.reduce((s, x) => s + (GP[x.grade] ?? 0) * x.credits, 0) /
+          Math.max(1, latestSemester.subjects.reduce((s, x) => s + x.credits, 0))
+        : latestSemester.gpa)
+    : null
   const graduationYear = user.intakeYear + 4
   const initials = user.fullName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
 
@@ -358,7 +378,7 @@ export default async function ProfilePage() {
           <div className="pf-score-strip">
             {[
               { label: "Overall Score", sub: "Combined", value: overallScore, color: "#fff" },
-              { label: "Academic",      sub: `Avg GPA ${avgGpa.toFixed(2)}`,  value: academicScore, color: "oklch(0.6231 0.1880 259.8145)" },
+              { label: "Academic",      sub: `CGPA ${avgGpa.toFixed(2)}`,  value: academicScore, color: "oklch(0.6231 0.1880 259.8145)" },
               { label: "Sports",        sub: `${sports.length} achievements`, value: sportsScore,   color: "oklch(0.60 0.20 145)" },
               { label: "Society",       sub: `${clubs.length} clubs`,          value: societyScore,  color: "oklch(0.65 0.18 310)" },
             ].map((s, i) => (
@@ -408,7 +428,7 @@ export default async function ProfilePage() {
               <>
                 <div className="pf-sem-header">
                   <div>
-                    <div className="pf-gpa-big">{latestSemester.gpa?.toFixed(2) ?? "—"}</div>
+                    <div className="pf-gpa-big">{latestSemGpa !== null ? latestSemGpa.toFixed(2) : "—"}</div>
                     <div className="pf-gpa-label">GPA / 4.00</div>
                   </div>
                   <div style={{ width: 1, height: 48, background: "var(--border,#e5e7eb)", flexShrink: 0 }} />
@@ -422,16 +442,16 @@ export default async function ProfilePage() {
                   </div>
                   <div style={{
                     marginLeft: "auto", padding: ".35rem .9rem", borderRadius: "999px",
-                    background: latestSemester.gpa && latestSemester.gpa >= 3.5
+                    background: latestSemGpa !== null && latestSemGpa >= 3.5
                       ? "oklch(0.55 0.20 145 / .1)" : "oklch(0.4882 0.2172 264.3763 / .1)",
-                    border: latestSemester.gpa && latestSemester.gpa >= 3.5
+                    border: latestSemGpa !== null && latestSemGpa >= 3.5
                       ? "1px solid oklch(0.55 0.20 145 / .25)" : "1px solid oklch(0.4882 0.2172 264.3763 / .25)",
                     fontSize: ".7rem", fontWeight: 700,
-                    color: latestSemester.gpa && latestSemester.gpa >= 3.5
+                    color: latestSemGpa !== null && latestSemGpa >= 3.5
                       ? "oklch(0.35 0.18 145)" : "oklch(0.4882 0.2172 264.3763)",
                   }}>
-                    {latestSemester.gpa && latestSemester.gpa >= 3.7 ? "🎖 Dean's List" :
-                     latestSemester.gpa && latestSemester.gpa >= 3.0 ? "✓ Good Standing" : "⚠ Needs Improvement"}
+                    {latestSemGpa !== null && latestSemGpa >= 3.7 ? "🎖 Dean's List" :
+                     latestSemGpa !== null && latestSemGpa >= 3.0 ? "✓ Good Standing" : "⚠ Needs Improvement"}
                   </div>
                 </div>
 

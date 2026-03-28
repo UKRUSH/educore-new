@@ -114,6 +114,8 @@ model SubjectResult {
   subjectCode String
   subjectName String
   credits     Int
+  caMarks     Float?
+  finalMarks  Float?
   marks       Float
   grade       String
   semesterId  Int

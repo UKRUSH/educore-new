@@ -17,9 +17,12 @@ export default async function DashboardPage() {
       }),
       prisma.semester.findMany({
         where: { userId: session.userId },
-        orderBy: { semesterNum: "desc" },
+        orderBy: [{ academicYear: "desc" }, { semesterNum: "desc" }],
         take: 1,
-        select: { gpa: true, semesterNum: true },
+        select: {
+          gpa: true, semesterNum: true,
+          subjects: { select: { grade: true, credits: true } },
+        },
       }),
       prisma.studentClub.count({ where: { userId: session.userId, isActive: true } }),
       prisma.sportAchievement.count({ where: { userId: session.userId } }),
@@ -39,7 +42,22 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login")
 
-  const latestGpa = semesters[0]?.gpa ?? null
+  const GRADE_POINTS: Record<string, number> = {
+    "A+": 4.0, "A": 4.0, "A-": 3.7,
+    "B+": 3.3, "B": 3.0, "B-": 2.7,
+    "C+": 2.3, "C": 2.0, "C-": 1.7,
+    "D": 1.0, "F": 0.0,
+  }
+  function calcGpaFromSubjects(subjects: { grade: string; credits: number }[]) {
+    if (!subjects.length) return null
+    const pts = subjects.reduce((s, x) => s + (GRADE_POINTS[x.grade] ?? 0) * x.credits, 0)
+    const cr  = subjects.reduce((s, x) => s + x.credits, 0)
+    return cr > 0 ? pts / cr : null
+  }
+  const latestSem = semesters[0] ?? null
+  const latestGpa = latestSem
+    ? (calcGpaFromSubjects(latestSem.subjects) ?? latestSem.gpa)
+    : null
   const initials = user.fullName.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()
   const hour = new Date().getHours()
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
@@ -55,7 +73,7 @@ export default async function DashboardPage() {
   const stats = [
     {
       label: "Current GPA", value: latestGpa !== null ? latestGpa.toFixed(2) : "—",
-      sub: semesters[0] ? `Semester ${semesters[0].semesterNum}` : "No records yet",
+      sub: latestSem ? `Semester ${latestSem.semesterNum}` : "No records yet",
       icon: "📊", from: "oklch(0.4882 0.2172 264.3763)", to: "oklch(0.6231 0.1880 259.8145)",
       progress: latestGpa ? (latestGpa / 4) * 100 : 0,
       href: "/profile/academics",
