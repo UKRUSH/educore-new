@@ -94,6 +94,7 @@ model User {
   sentMessages        Message[]            @relation("SentMessages")
   receivedMessages    Message[]            @relation("ReceivedMessages")
   fileAssets          FileAsset[]
+  clubAttendances     ClubAttendance[]
 }
 
 model Semester {
@@ -154,8 +155,9 @@ model Club {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  members      StudentClub[]
-  applications ClubApplication[]
+  members            StudentClub[]
+  applications       ClubApplication[]
+  attendanceSessions ClubAttendanceSession[]
 }
 
 model StudentClub {
@@ -201,6 +203,30 @@ model ApplicationFeedback {
   createdAt     DateTime @default(now())
 
   application ClubApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+model ClubAttendanceSession {
+  id        Int      @id @default(autoincrement())
+  clubId    Int
+  token     String   @unique
+  label     String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  club        Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  attendances ClubAttendance[]
+}
+
+model ClubAttendance {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  sessionId Int
+  scannedAt DateTime @default(now())
+
+  user    User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session ClubAttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sessionId])
 }
 
 model StudyMaterial {

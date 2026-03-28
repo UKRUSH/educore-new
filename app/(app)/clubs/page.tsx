@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic"
 
 import { useState, useEffect, useMemo } from "react"
+import QRScannerModal from "@/components/QRScannerModal"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,12 @@ type Club = {
   applications: Application[]; members: Member[]
   _count: { members: number }
 }
+type MyClub = {
+  membershipId: number; clubId: number; role: string
+  joinedDate: string; participationPoints: number; attendanceCount: number
+  club: { id: number; name: string; category: string; logoUrl: string | null; _count: { members: number } }
+}
+type AttendanceQR = { token: string; label: string; expiresAt: string; qrDataUrl: string; clubId: number }
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -427,6 +434,102 @@ const CSS = `
 /* View-app loading skeleton */
 .cb-view-loading { display: flex; flex-direction: column; gap: .85rem; padding: .5rem 0; }
 .cb-view-skel { border-radius: .55rem; background: var(--muted); animation: cbSkel 1.4s ease-in-out infinite; }
+
+/* ── My Clubs section ── */
+.cb-my-section {
+  margin-bottom: 2rem; background: var(--card);
+  border: 1px solid var(--border); border-radius: 1.25rem; overflow: hidden;
+}
+.cb-my-header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(90deg, oklch(0.96 0.025 145), var(--card));
+}
+.cb-my-title { font-size: .95rem; font-weight: 800; color: var(--foreground); display: flex; align-items: center; gap: .5rem; }
+.cb-my-count {
+  display: inline-flex; align-items: center;
+  padding: .18rem .65rem; border-radius: 999px;
+  background: oklch(0.93 0.06 145 / 0.5); border: 1px solid oklch(0.82 0.1 145 / 0.5);
+  font-size: .72rem; font-weight: 700; color: oklch(0.38 0.18 145);
+}
+.cb-my-body { padding: 1.1rem 1.4rem; display: flex; flex-direction: column; gap: .75rem; }
+
+.cb-my-card {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .9rem 1rem; border-radius: .9rem;
+  background: var(--background); border: 1px solid var(--border);
+  transition: border-color .18s, box-shadow .18s;
+}
+.cb-my-card:hover { border-color: oklch(0.82 0.1 145 / 0.5); box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+.cb-my-logo {
+  width: 2.75rem; height: 2.75rem; border-radius: .75rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; font-weight: 900; color: #fff; overflow: hidden;
+}
+.cb-my-logo img { width: 100%; height: 100%; object-fit: cover; }
+.cb-my-info { flex: 1; min-width: 0; }
+.cb-my-name { font-size: .9rem; font-weight: 800; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-my-meta { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; margin-top: .2rem; }
+.cb-my-role {
+  display: inline-flex; align-items: center; gap: .2rem;
+  padding: .12rem .55rem; border-radius: 999px;
+  font-size: .67rem; font-weight: 700;
+  background: oklch(0.93 0.05 260 / 0.45); color: oklch(0.42 0.2 260);
+  border: 1px solid oklch(0.82 0.1 260 / 0.4);
+}
+.cb-my-stat { font-size: .72rem; color: var(--muted-foreground); display: flex; align-items: center; gap: .25rem; }
+.cb-my-actions { display: flex; gap: .5rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+.cb-scan-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem .95rem; border-radius: .65rem;
+  background: linear-gradient(135deg, oklch(0.55 0.2 145), oklch(0.45 0.2 150));
+  color: #fff; font-size: .78rem; font-weight: 800; border: none; cursor: pointer;
+  box-shadow: 0 2px 8px oklch(0.5 0.18 145 / 0.3);
+  transition: opacity .18s, transform .15s;
+}
+.cb-scan-btn:hover { opacity: .9; transform: translateY(-1px); }
+
+.cb-qr-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem .95rem; border-radius: .65rem;
+  background: oklch(0.93 0.05 260 / 0.45); border: 1.5px solid oklch(0.82 0.1 260 / 0.5);
+  color: oklch(0.42 0.2 260); font-size: .78rem; font-weight: 700;
+  cursor: pointer; transition: all .18s;
+}
+.cb-qr-btn:hover { background: oklch(0.88 0.08 260 / 0.5); }
+.cb-qr-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* QR display modal */
+.cb-qr-display-modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1.35rem; width: 100%; max-width: 360px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.25);
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: cbSlideUp .28s cubic-bezier(.22,1,.36,1);
+}
+.cb-qr-display-header {
+  padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cb-qr-display-title { font-size: .95rem; font-weight: 800; color: var(--foreground); }
+.cb-qr-display-body { padding: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.cb-qr-display-img { border-radius: .75rem; border: 1px solid var(--border); }
+.cb-qr-expire { font-size: .78rem; color: var(--muted-foreground); text-align: center; }
+.cb-qr-label-inp {
+  width: 100%; border: 1.5px solid var(--border); background: var(--background);
+  border-radius: .65rem; padding: .55rem .85rem; font-size: .875rem;
+  color: var(--foreground); outline: none; transition: border-color .2s;
+}
+.cb-qr-label-inp:focus { border-color: oklch(0.62 0.2 260); }
+.cb-gen-btn {
+  width: 100%; padding: .75rem; border-radius: .75rem;
+  background: linear-gradient(135deg, oklch(0.62 0.2 260), oklch(0.5 0.22 265));
+  color: #fff; font-size: .875rem; font-weight: 800; border: none; cursor: pointer;
+  transition: opacity .18s;
+}
+.cb-gen-btn:hover { opacity: .9; }
+.cb-gen-btn:disabled { opacity: .5; cursor: not-allowed; }
 `
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -456,13 +559,41 @@ export default function ClubsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting]         = useState(false)
 
+  const [myClubs, setMyClubs]           = useState<MyClub[]>([])
+  const [myClubsLoading, setMyClubsLoading] = useState(true)
+  const [showScanner, setShowScanner]   = useState(false)
+  const [scanSuccess, setScanSuccess]   = useState<{ clubName: string; label: string } | null>(null)
+  const [showQRFor, setShowQRFor]       = useState<MyClub | null>(null)
+  const [qrData, setQrData]             = useState<AttendanceQR | null>(null)
+  const [qrLabel, setQrLabel]           = useState("Club Meeting")
+  const [generatingQR, setGeneratingQR] = useState(false)
+  const [qrError, setQrError]           = useState("")
+
   async function load() {
     setLoading(true)
-    const res = await fetch("/api/clubs")
-    if (res.ok) setClubs(await res.json())
+    const [clubsRes, myRes] = await Promise.all([
+      fetch("/api/clubs"),
+      fetch("/api/clubs/my"),
+    ])
+    if (clubsRes.ok) setClubs(await clubsRes.json())
+    if (myRes.ok) setMyClubs(await myRes.json())
     setLoading(false)
+    setMyClubsLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  async function generateQR(membership: MyClub) {
+    setGeneratingQR(true); setQrError(""); setQrData(null)
+    const res = await fetch("/api/clubs/attendance/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clubId: membership.clubId, label: qrLabel, expiresInMinutes: 120 }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setQrError(data.error ?? "Failed to generate QR."); setGeneratingQR(false); return }
+    setQrData(data)
+    setGeneratingQR(false)
+  }
 
   const filtered = useMemo(() =>
     clubs
@@ -592,6 +723,69 @@ export default function ClubsPage() {
             </div>
           </div>
         </div>
+
+        {/* ── My Clubs ── */}
+        <div className="cb-my-section">
+          <div className="cb-my-header">
+            <div className="cb-my-title">
+              <span>🏅</span> My Clubs
+              {!myClubsLoading && <span className="cb-my-count">{myClubs.length}</span>}
+            </div>
+          </div>
+          <div className="cb-my-body">
+            {myClubsLoading ? (
+              <>
+                {[1,2].map((i) => <div key={i} className="cb-my-card" style={{ height: "4rem", background: "var(--muted)", animation: "cbSkel 1.4s ease-in-out infinite" }} />)}
+              </>
+            ) : myClubs.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "1.75rem 1rem", color: "var(--muted-foreground)", fontSize: ".875rem" }}>
+                <div style={{ fontSize: "1.75rem", marginBottom: ".5rem" }}>🏛️</div>
+                You haven&apos;t joined any clubs yet. Apply to a club below to get started!
+              </div>
+            ) : myClubs.map((m) => {
+                const catMeta  = CAT_META[m.club.category] ?? CAT_META.OTHER
+                const heroGrad = `linear-gradient(135deg, ${catMeta.hero}, oklch(0.38 0.18 265))`
+                return (
+                  <div key={m.membershipId} className="cb-my-card">
+                    <div className="cb-my-logo" style={{ background: heroGrad }}>
+                      {m.club.logoUrl
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={m.club.logoUrl} alt={m.club.name} />
+                        : catMeta.icon}
+                    </div>
+                    <div className="cb-my-info">
+                      <div className="cb-my-name">{m.club.name}</div>
+                      <div className="cb-my-meta">
+                        <span className="cb-my-role">⭐ {m.role}</span>
+                        <span className="cb-my-stat">
+                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                          {m.club._count.members} members
+                        </span>
+                        <span className="cb-my-stat">
+                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          {m.attendanceCount} attended
+                        </span>
+                        <span className="cb-my-stat">✦ {m.participationPoints} pts</span>
+                      </div>
+                    </div>
+                    <div className="cb-my-actions">
+                      <button className="cb-scan-btn" onClick={() => { setScanSuccess(null); setShowScanner(true) }}>
+                        📷 Scan QR
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+
+        {/* Scan success toast */}
+        {scanSuccess && (
+          <div style={{ marginBottom: "1rem", background: "oklch(0.93 0.06 145 / 0.35)", border: "1px solid oklch(0.82 0.1 145 / 0.5)", borderRadius: ".75rem", padding: ".75rem 1rem", fontSize: ".875rem", fontWeight: 600, color: "oklch(0.35 0.18 145)", display: "flex", alignItems: "center", gap: ".5rem" }}>
+            ✓ Attendance marked for <strong>{scanSuccess.clubName}</strong> — {scanSuccess.label}
+            <button style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "oklch(0.45 0.2 145)", fontWeight: 700 }} onClick={() => setScanSuccess(null)}>✕</button>
+          </div>
+        )}
 
         {/* ── Search ── */}
         <div className="cb-toolbar">
@@ -1183,6 +1377,80 @@ export default function ClubsPage() {
         })()}
 
       </div>
+
+      {/* ── QR Scanner Modal ── */}
+      {showScanner && (
+        <QRScannerModal
+          onClose={() => setShowScanner(false)}
+          onSuccess={(result) => {
+            setShowScanner(false)
+            if (result.success && result.clubName && result.label) {
+              setScanSuccess({ clubName: result.clubName, label: result.label })
+              load() // refresh attendance counts
+            }
+          }}
+        />
+      )}
+
+      {/* ── Create QR Modal ── */}
+      {showQRFor && (
+        <div className="cb-backdrop" onClick={() => { setShowQRFor(null); setQrData(null) }}>
+          <div className="cb-qr-display-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="cb-qr-display-header">
+              <div className="cb-qr-display-title">🔲 Attendance QR — {showQRFor.club.name}</div>
+              <button className="cb-modal-close" onClick={() => { setShowQRFor(null); setQrData(null) }}>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <div className="cb-qr-display-body">
+              {!qrData ? (
+                <>
+                  <div style={{ width: "100%" }}>
+                    <label style={{ fontSize: ".72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--muted-foreground)", display: "block", marginBottom: ".35rem" }}>Session Label</label>
+                    <input
+                      className="cb-qr-label-inp"
+                      placeholder="e.g. Weekly Meeting, Practice Session"
+                      value={qrLabel}
+                      onChange={(e) => setQrLabel(e.target.value)}
+                    />
+                  </div>
+                  {qrError && (
+                    <div style={{ width: "100%", background: "oklch(0.97 0.05 25 / 0.5)", border: "1px solid oklch(0.88 0.1 25 / 0.4)", borderRadius: ".65rem", padding: ".65rem .9rem", fontSize: ".82rem", color: "oklch(0.5 0.22 25)" }}>
+                      {qrError}
+                    </div>
+                  )}
+                  <button className="cb-gen-btn" onClick={() => generateQR(showQRFor)} disabled={generatingQR}>
+                    {generatingQR ? "Generating…" : "Generate QR Code →"}
+                  </button>
+                  <p style={{ fontSize: ".78rem", color: "var(--muted-foreground)", textAlign: "center" }}>
+                    QR code is valid for 2 hours. Members scan it to mark their attendance.
+                  </p>
+                </>
+              ) : (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qrData.qrDataUrl} alt="Attendance QR" width={240} height={240} className="cb-qr-display-img" />
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontWeight: 800, fontSize: ".9rem", color: "var(--foreground)" }}>{qrData.label}</div>
+                    <div className="cb-qr-expire" style={{ marginTop: ".35rem" }}>
+                      Expires {new Date(qrData.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
+                  <button
+                    style={{ fontSize: ".8rem", color: "oklch(0.52 0.2 260)", background: "none", border: "none", cursor: "pointer" }}
+                    onClick={() => { setQrData(null) }}
+                  >
+                    Generate new QR
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </>
   )
 }
