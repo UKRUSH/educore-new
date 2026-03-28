@@ -9,7 +9,7 @@ type Student = {
   id: number; fullName: string; studentId: string
   faculty: string; degree: string; intakeYear: number; photoUrl: string | null
   bestGpa: number
-  latestSem: { gpa: number; semesterNum: number; academicYear: string } | null
+  latestSem: { gpa: number | null; semesterNum: number; academicYear: string } | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -24,12 +24,7 @@ function gpaLabel(gpa: number) {
   if (gpa >= 3.7) return "High Honours"
   return "Honours"
 }
-function rankBadge(rank: number) {
-  if (rank === 1) return { label: "🥇", color: "#f59e0b" }
-  if (rank === 2) return { label: "🥈", color: "#94a3b8" }
-  if (rank === 3) return { label: "🥉", color: "#cd7c3a" }
-  return { label: `#${rank}`, color: "var(--muted-foreground)" }
-}
+
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS = `
@@ -87,29 +82,11 @@ const CSS = `
 .dl-chip.blue{background:oklch(0.93 0.05 258 / .5);border-color:oklch(0.82 0.1 258);color:oklch(0.42 0.18 260);}
 .dl-chip.green{background:oklch(0.93 0.06 145 / .5);border-color:oklch(0.82 0.1 145);color:oklch(0.38 0.18 145);}
 
-/* Top 3 podium */
-.dl-podium{display:flex;gap:1rem;justify-content:center;align-items:flex-end;flex-wrap:wrap;padding:.5rem 0;}
-.dl-pod-card{background:var(--card);border:1px solid var(--border);border-radius:1.15rem;
-  display:flex;flex-direction:column;align-items:center;gap:.55rem;padding:1.35rem 1.2rem;
-  transition:transform .2s,box-shadow .2s;min-width:160px;flex:1;max-width:200px;}
-.dl-pod-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.1);}
-.dl-pod-card.rank-1{border-color:oklch(0.82 0.15 55);background:linear-gradient(180deg,oklch(0.97 0.04 60),var(--card));}
-.dl-pod-rank{font-size:1.75rem;line-height:1;}
-.dl-pod-avatar{width:3.5rem;height:3.5rem;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:.85rem;font-weight:900;color:#fff;overflow:hidden;
-  border:2.5px solid var(--border);}
-.dl-pod-avatar img{width:100%;height:100%;object-fit:cover;}
-.dl-pod-name{font-size:.875rem;font-weight:800;color:var(--foreground);text-align:center;line-height:1.3;}
-.dl-pod-faculty{font-size:.68rem;color:var(--muted-foreground);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}
-.dl-pod-gpa-wrap{display:flex;flex-direction:column;align-items:center;gap:.18rem;}
-.dl-pod-gpa{font-size:1.4rem;font-weight:900;letter-spacing:-.03em;}
-.dl-pod-gpa-label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);}
-
 /* Grid */
 .dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
 @media(max-width:900px){.dl-grid{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:560px){.dl-grid{grid-template-columns:1fr;}}
-.dl-skel{background:var(--muted);border-radius:1.1rem;animation:dlSkel 1.4s ease-in-out infinite;}
+.dl-skel{background:var(--muted);border-radius:1rem;animation:dlSkel 1.4s ease-in-out infinite;}
 @keyframes dlSkel{0%,100%{opacity:1}50%{opacity:.4}}
 .dl-empty{text-align:center;padding:4rem 1.5rem;display:flex;flex-direction:column;align-items:center;gap:.55rem;}
 .dl-empty-icon{width:4.5rem;height:4.5rem;border-radius:1.2rem;background:var(--muted);display:flex;align-items:center;justify-content:center;font-size:2rem;margin-bottom:.3rem;}
@@ -117,28 +94,29 @@ const CSS = `
 .dl-empty-sub{font-size:.875rem;color:var(--muted-foreground);}
 
 /* Card */
-.dl-card{background:var(--card);border:1px solid var(--border);border-radius:1.1rem;overflow:hidden;
-  display:flex;flex-direction:column;transition:box-shadow .2s,border-color .2s,transform .2s;}
-.dl-card:hover{box-shadow:0 8px 28px rgba(0,0,0,.08);transform:translateY(-2px);}
-.dl-card-accent{height:3px;}
-.dl-card-body{padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.8rem;}
-.dl-card-top{display:flex;align-items:flex-start;gap:.85rem;}
-.dl-rank-wrap{display:flex;flex-direction:column;align-items:center;gap:.2rem;flex-shrink:0;min-width:2rem;}
-.dl-rank-num{font-size:.75rem;font-weight:800;color:var(--muted-foreground);}
+.dl-card{
+  background:var(--card);border:1px solid var(--border);border-radius:1rem;
+  padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.85rem;
+  transition:box-shadow .18s,transform .18s;
+}
+.dl-card:hover{box-shadow:0 6px 22px rgba(0,0,0,.07);transform:translateY(-2px);}
+.dl-card-top{display:flex;align-items:center;gap:.85rem;}
 .dl-avatar{width:2.75rem;height:2.75rem;border-radius:50%;flex-shrink:0;
   background:linear-gradient(135deg,oklch(0.52 0.2 260),oklch(0.42 0.22 265));
   display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:900;color:#fff;overflow:hidden;}
 .dl-avatar img{width:100%;height:100%;object-fit:cover;}
-.dl-name{font-size:.875rem;font-weight:800;color:var(--foreground);line-height:1.3;margin-bottom:.2rem;}
-.dl-id{font-size:.7rem;color:var(--muted-foreground);font-weight:600;font-family:monospace;}
-.dl-faculty{font-size:.72rem;color:var(--muted-foreground);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}
-.dl-gpa-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
-.dl-gpa-badge{display:inline-flex;flex-direction:column;align-items:center;padding:.45rem .85rem;border-radius:.75rem;gap:.12rem;}
-.dl-gpa-val{font-size:1.3rem;font-weight:900;letter-spacing:-.03em;line-height:1;}
-.dl-gpa-lbl{font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;opacity:.75;}
-.dl-honour-badge{display:inline-flex;align-items:center;gap:.25rem;padding:.22rem .65rem;border-radius:999px;font-size:.68rem;font-weight:800;}
-.dl-sem-info{font-size:.72rem;color:var(--muted-foreground);display:flex;align-items:center;gap:.35rem;}
-.dl-sem-dot{width:4px;height:4px;border-radius:50%;background:var(--muted-foreground);flex-shrink:0;}
+.dl-info{flex:1;min-width:0;}
+.dl-name{font-size:.88rem;font-weight:800;color:var(--foreground);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dl-id{font-size:.69rem;color:var(--muted-foreground);font-weight:600;font-family:monospace;margin-top:.1rem;}
+.dl-faculty{font-size:.7rem;color:var(--muted-foreground);margin-top:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dl-divider{height:1px;background:var(--border);}
+.dl-card-foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
+.dl-gpa-block{display:flex;align-items:baseline;gap:.3rem;}
+.dl-gpa-val{font-size:1.4rem;font-weight:900;letter-spacing:-.03em;line-height:1;}
+.dl-gpa-max{font-size:.72rem;color:var(--muted-foreground);font-weight:600;}
+.dl-honour-pill{display:inline-flex;align-items:center;gap:.28rem;padding:.22rem .65rem;
+  border-radius:999px;font-size:.68rem;font-weight:700;border:1px solid;}
+.dl-sem-info{font-size:.69rem;color:var(--muted-foreground);margin-top:.25rem;}
 `
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -172,18 +150,9 @@ export default function AdminDeanListPage() {
     [students, search]
   )
 
-  const top3    = filtered.slice(0, 3)
-  const rest    = filtered.slice(3)
   const avgGpa  = students.length ? (students.reduce((s,u)=>s+u.bestGpa,0)/students.length).toFixed(2) : "—"
   const dist    = students.filter(s=>s.bestGpa>=3.9).length
   const honours = students.filter(s=>s.bestGpa>=3.7&&s.bestGpa<3.9).length
-
-  // Podium avatar gradient by rank
-  const podGrad = (rank: number) => rank===1
-    ? "linear-gradient(135deg,oklch(0.58 0.22 55),oklch(0.7 0.2 65))"
-    : rank===2
-    ? "linear-gradient(135deg,oklch(0.52 0.04 260),oklch(0.62 0.03 258))"
-    : "linear-gradient(135deg,oklch(0.55 0.14 45),oklch(0.65 0.12 55))"
 
   return (
     <>
@@ -241,99 +210,60 @@ export default function AdminDeanListPage() {
           {students.length-dist-honours>0&&<span className="dl-chip gold"><span className="dl-chip-dot"/>⭐ {students.length-dist-honours} Honours (3.5+)</span>}
         </div>
 
-        {/* Loading skeletons */}
+        {/* List */}
         {loading ? (
-          <div className="dl-grid">{[...Array(9)].map((_,i)=><div key={i} className="dl-skel" style={{height:"9rem"}}/>)}</div>
+          <div className="dl-grid">{[...Array(6)].map((_,i)=><div key={i} className="dl-skel" style={{height:"8rem"}}/>)}</div>
         ) : filtered.length === 0 ? (
           <div className="dl-empty">
             <div className="dl-empty-icon">★</div>
             <div className="dl-empty-title">No students found</div>
-            <div className="dl-empty-sub">{search?"Try a different search.":"No students meet this GPA threshold."}</div>
+            <div className="dl-empty-sub">{search ? "Try a different search." : "No students meet this GPA threshold."}</div>
           </div>
         ) : (
-          <>
-            {/* ── Top 3 Podium ── */}
-            {top3.length > 0 && (
-              <div className="dl-podium">
-                {top3.map((s, i) => {
-                  const rank = i + 1
-                  const gc = gpaColor(s.bestGpa)
-                  return (
-                    <div key={s.id} className={`dl-pod-card${rank===1?" rank-1":""}`}>
-                      <div className="dl-pod-rank">{rankBadge(rank).label}</div>
-                      <div className="dl-pod-avatar" style={{background: podGrad(rank), border: `2.5px solid ${rank===1?"oklch(0.82 0.15 55)":"var(--border)"}`}}>
-                        {s.photoUrl
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={s.photoUrl} alt={s.fullName}/>
-                          : initials(s.fullName)
-                        }
-                      </div>
-                      <div className="dl-pod-name">{s.fullName}</div>
-                      <div className="dl-pod-faculty">{s.faculty.replace("Faculty of ","")}</div>
-                      <div className="dl-pod-gpa-wrap">
-                        <div className="dl-pod-gpa" style={{color: gc.fg}}>{s.bestGpa.toFixed(2)}</div>
-                        <div className="dl-pod-gpa-label">{gpaLabel(s.bestGpa)}</div>
-                      </div>
+          <div className="dl-grid">
+            {filtered.map((s) => {
+              const gc = gpaColor(s.bestGpa)
+              return (
+                <div key={s.id} className="dl-card">
+                  {/* Top row: avatar + info */}
+                  <div className="dl-card-top">
+                    <div className="dl-avatar" style={{background:`linear-gradient(135deg,${gc.fg},oklch(0.38 0.18 265))`}}>
+                      {s.photoUrl
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={s.photoUrl} alt={s.fullName}/>
+                        : initials(s.fullName)
+                      }
                     </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* ── Rest of list ── */}
-            {rest.length > 0 && (
-              <div className="dl-grid">
-                {rest.map((s, i) => {
-                  const rank = i + 4
-                  const gc   = gpaColor(s.bestGpa)
-                  const rb   = rankBadge(rank)
-                  const grad = `linear-gradient(135deg,${gc.fg},oklch(0.38 0.18 265))`
-                  return (
-                    <div key={s.id} className="dl-card">
-                      <div className="dl-card-accent" style={{background: `linear-gradient(90deg,${gc.fg},oklch(0.62 0.18 265))`}}/>
-                      <div className="dl-card-body">
-                        <div className="dl-card-top">
-                          <div className="dl-rank-wrap">
-                            <span className="dl-rank-num" style={{color: rb.color}}>{rb.label}</span>
-                          </div>
-                          <div className="dl-avatar" style={{background: grad}}>
-                            {s.photoUrl
-                              // eslint-disable-next-line @next/next/no-img-element
-                              ? <img src={s.photoUrl} alt={s.fullName}/>
-                              : initials(s.fullName)
-                            }
-                          </div>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div className="dl-name">{s.fullName}</div>
-                            <div className="dl-id">{s.studentId}</div>
-                            <div className="dl-faculty">{s.faculty.replace("Faculty of ","")}</div>
-                          </div>
-                        </div>
-
-                        <div className="dl-gpa-row">
-                          <div className="dl-gpa-badge" style={{background: gc.bg, border: `1px solid ${gc.border}`}}>
-                            <span className="dl-gpa-val" style={{color: gc.fg}}>{s.bestGpa.toFixed(2)}</span>
-                            <span className="dl-gpa-lbl" style={{color: gc.fg}}>GPA</span>
-                          </div>
-                          <span className="dl-honour-badge" style={{background: gc.bg, color: gc.fg, border: `1px solid ${gc.border}`}}>
-                            {s.bestGpa>=3.9?"🥇":s.bestGpa>=3.7?"🏅":"⭐"} {gpaLabel(s.bestGpa)}
-                          </span>
-                        </div>
-
-                        {s.latestSem && (
-                          <div className="dl-sem-info">
-                            <span>Year {s.intakeYear}</span>
-                            <span className="dl-sem-dot"/>
-                            <span>Sem {s.latestSem.semesterNum} · {s.latestSem.academicYear}</span>
-                          </div>
-                        )}
-                      </div>
+                    <div className="dl-info">
+                      <div className="dl-name">{s.fullName}</div>
+                      <div className="dl-id">{s.studentId}</div>
+                      <div className="dl-faculty">{s.faculty.replace("Faculty of ","")}</div>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </>
+                  </div>
+
+                  <div className="dl-divider"/>
+
+                  {/* Bottom row: GPA + honour + semester */}
+                  <div>
+                    <div className="dl-card-foot">
+                      <div className="dl-gpa-block">
+                        <span className="dl-gpa-val" style={{color: gc.fg}}>{s.bestGpa.toFixed(2)}</span>
+                        <span className="dl-gpa-max">/ 4.00</span>
+                      </div>
+                      <span className="dl-honour-pill" style={{background: gc.bg, color: gc.fg, borderColor: gc.border}}>
+                        {s.bestGpa>=3.9?"🥇":s.bestGpa>=3.7?"🏅":"⭐"} {gpaLabel(s.bestGpa)}
+                      </span>
+                    </div>
+                    {s.latestSem && (
+                      <div className="dl-sem-info">
+                        Sem {s.latestSem.semesterNum} · {s.latestSem.academicYear} · Intake {s.intakeYear}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
 
       </div>

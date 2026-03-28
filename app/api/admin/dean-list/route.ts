@@ -4,6 +4,28 @@ import type { NextRequest } from "next/server"
 import { prisma } from "@/lib/db/prisma"
 import { getSession } from "@/lib/auth/session"
 
+const GRADE_POINTS: Record<string, number> = {
+  "A+": 4.0, "A": 4.0, "A-": 3.7,
+  "B+": 3.3, "B": 3.0, "B-": 2.7,
+  "C+": 2.3, "C": 2.0, "C-": 1.7,
+  "D": 1.0,  "F": 0.0,
+}
+
+function calcCGPA(semesters: { subjects: { grade: string; credits: number }[] }[]) {
+  const subjects = semesters.flatMap(s => s.subjects)
+  if (!subjects.length) return null
+  const pts = subjects.reduce((sum, s) => sum + (GRADE_POINTS[s.grade] ?? 0) * s.credits, 0)
+  const cr  = subjects.reduce((sum, s) => sum + s.credits, 0)
+  return cr > 0 ? pts / cr : null
+}
+
+function calcSemGPA(subjects: { grade: string; credits: number }[]) {
+  if (!subjects.length) return null
+  const pts = subjects.reduce((sum, s) => sum + (GRADE_POINTS[s.grade] ?? 0) * s.credits, 0)
+  const cr  = subjects.reduce((sum, s) => sum + s.credits, 0)
+  return cr > 0 ? pts / cr : null
+}
+
 export async function GET(request: NextRequest) {
   const session = await getSession()
   if (!session || session.role !== "ADMIN")
@@ -14,19 +36,18 @@ export async function GET(request: NextRequest) {
   const search    = searchParams.get("search") ?? ""
   const faculty   = searchParams.get("faculty") ?? ""
 
-  // Get students who have at least one semester with GPA >= threshold
+  // Fetch all students with their semesters + subjects
   const students = await prisma.user.findMany({
     where: {
       role: "STUDENT",
       ...(search ? {
         OR: [
-          { fullName: { contains: search } },
+          { fullName:  { contains: search } },
           { studentId: { contains: search } },
-          { faculty: { contains: search } },
+          { faculty:   { contains: search } },
         ],
       } : {}),
       ...(faculty ? { faculty: { contains: faculty } } : {}),
-      semesters: { some: { gpa: { gte: threshold } } },
     },
     select: {
       id: true,
@@ -37,22 +58,58 @@ export async function GET(request: NextRequest) {
       intakeYear: true,
       photoUrl: true,
       semesters: {
-        where: { gpa: { not: null } },
         orderBy: [{ academicYear: "desc" }, { semesterNum: "desc" }],
-        select: { gpa: true, semesterNum: true, academicYear: true },
+        select: {
+          id: true,
+          semesterNum: true,
+          academicYear: true,
+          gpa: true,
+          subjects: {
+            select: { grade: true, credits: true },
+          },
+        },
       },
     },
     orderBy: { fullName: "asc" },
   })
 
-  // Attach best GPA and latest semester, filter to only those where latest semester qualifies
-  const result = students
-    .map((s) => {
-      const bestGpa   = Math.max(...s.semesters.map(sem => sem.gpa ?? 0))
-      const latestSem = s.semesters[0] ?? null
-      return { ...s, bestGpa, latestSem }
-    })
-    .filter((s) => s.bestGpa >= threshold)
+  // Calculate real CGPA from subjects for each student
+  const enriched = students.map(s => {
+    const cgpa = calcCGPA(s.semesters) ??
+      // fallback: average of non-null stored gpa values
+      (s.semesters.filter(sem => sem.gpa !== null).length > 0
+        ? s.semesters.filter(sem => sem.gpa !== null).reduce((sum, sem) => sum + (sem.gpa ?? 0), 0) /
+          s.semesters.filter(sem => sem.gpa !== null).length
+        : null)
+
+    if (cgpa === null) return null
+
+    // Latest semester info
+    const latestSem = s.semesters[0] ?? null
+    const latestGpa = latestSem
+      ? (calcSemGPA(latestSem.subjects) ?? latestSem.gpa)
+      : null
+
+    return {
+      id:        s.id,
+      fullName:  s.fullName,
+      studentId: s.studentId,
+      faculty:   s.faculty,
+      degree:    s.degree,
+      intakeYear: s.intakeYear,
+      photoUrl:  s.photoUrl,
+      bestGpa:   cgpa,
+      latestSem: latestSem ? {
+        gpa:          latestGpa,
+        semesterNum:  latestSem.semesterNum,
+        academicYear: latestSem.academicYear,
+      } : null,
+    }
+  })
+
+  // Filter by threshold and sort by CGPA desc
+  const result = enriched
+    .filter((s): s is NonNullable<typeof s> => s !== null && s.bestGpa >= threshold)
     .sort((a, b) => b.bestGpa - a.bestGpa)
 
   return Response.json(result)
