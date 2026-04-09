@@ -103,6 +103,21 @@ export default async function DashboardPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+    <style>{`
+      .db-hero-right { display: flex; flex-direction: column; align-items: flex-end; gap: .75rem; flex-shrink: 0; }
+      .db-stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; }
+      .db-main-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
+      .db-main-span2 { grid-column: span 2; }
+      @media (max-width: 900px) {
+        .db-stats-grid { grid-template-columns: repeat(2,1fr); }
+        .db-main-grid { grid-template-columns: 1fr; }
+        .db-main-span2 { grid-column: span 1; }
+      }
+      @media (max-width: 540px) {
+        .db-stats-grid { grid-template-columns: 1fr 1fr; gap: .65rem; }
+        .db-hero-right { display: none; }
+      }
+    `}</style>
 
       {/* ════════════════════════════════
           WELCOME HERO
@@ -185,7 +200,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* Right — GPA + actions */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: ".75rem", flexShrink: 0 }}>
+          <div className="db-hero-right">
             {latestGpa !== null && (
               <div style={{
                 background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.18)",
@@ -216,7 +231,7 @@ export default async function DashboardPage() {
       {/* ════════════════════════════════
           STAT CARDS
       ════════════════════════════════ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem" }}>
+      <div className="db-stats-grid">
         {stats.map(s => (
           <Link key={s.label} href={s.href} style={{ textDecoration: "none" }}>
             <div style={{
@@ -271,11 +286,10 @@ export default async function DashboardPage() {
       {/* ════════════════════════════════
           MAIN GRID
       ════════════════════════════════ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1.25rem" }}>
+      <div className="db-main-grid">
 
         {/* ── Recent Materials (span 2) ── */}
-        <div style={{
-          gridColumn: "span 2",
+        <div className="db-main-span2" style={{
           background: "var(--card,#fff)",
           border: "1px solid var(--border,#e5e7eb)",
           borderRadius: "1.1rem", overflow: "hidden",

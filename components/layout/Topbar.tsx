@@ -312,7 +312,25 @@ const CSS = `
   position: fixed; inset: 0; z-index: 100;
 }
 
+/* ── Hamburger ── */
+.tb-hamburger {
+  display: none;
+  width: 38px; height: 38px; flex-shrink: 0;
+  align-items: center; justify-content: center;
+  border-radius: .75rem; cursor: pointer;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--background, #fafafa);
+  color: var(--foreground, #090909);
+  transition: all .18s;
+}
+.tb-hamburger:hover {
+  border-color: oklch(0.6231 0.1880 259.8145 / .45);
+  background: oklch(0.6231 0.1880 259.8145 / .06);
+}
+.tb-hamburger svg { width: 17px; height: 17px; }
+
 @media (max-width: 768px) {
+  .tb-hamburger { display: flex; }
   .tb-search { display: none; }
   .tb-greeting { display: none; }
   .tb-sep { display: none; }
@@ -324,6 +342,7 @@ const CSS = `
   .tb-page-icon { display: none; }
   .tb-breadcrumb { display: none; }
   .tb-notif-panel { width: 290px; }
+  .tb-root { padding: 0 .85rem; }
 }
 `
 
@@ -332,9 +351,11 @@ const CSS = `
 export default function Topbar({
   name,
   photoUrl: propPhotoUrl,
+  onMenuToggle,
 }: {
   name: string
   photoUrl: string | null
+  onMenuToggle?: () => void
 }) {
   const pathname = usePathname()
   const [notifOpen, setNotifOpen]     = useState(false)
@@ -405,6 +426,13 @@ export default function Topbar({
 
         {/* ── Left ── */}
         <div className="tb-left">
+          {/* Hamburger — mobile only */}
+          <button className="tb-hamburger" onClick={onMenuToggle} aria-label="Open menu">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+              <path d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+
           <div className="tb-page-icon">{pageMeta.icon}</div>
           <div className="tb-title-group">
             <div className="tb-page-title">{pageMeta.title}</div>

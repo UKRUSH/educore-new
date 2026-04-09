@@ -36,38 +36,36 @@ async function summarizeWithNvidia(
     baseURL: "https://integrate.api.nvidia.com/v1",
   })
 
-  const systemPrompt = `You are an educational AI assistant. You MUST return ONLY a valid JSON object — no explanation, no markdown, no code fences.
-The JSON must have exactly these keys:
+  const systemPrompt = `You are an educational AI assistant. Return ONLY a valid JSON object, no markdown or code fences.
 {
-  "quickSummary": "2-3 sentence overview of the material",
-  "detailedNotes": "Detailed notes covering key concepts and important points",
-  "keyTerms": "Comma-separated list of 8-15 key terms and definitions",
+  "quickSummary": "2-3 sentence overview",
+  "detailedNotes": "Key concepts and important points",
+  "keyTerms": "Comma-separated list of 6-10 key terms",
   "suggestedResources": [
     { "title": "Resource title", "sourceName": "Source name", "url": "https://example.com", "type": "ARTICLE" }
   ]
 }
-For suggestedResources suggest 4-6 resources. Type must be one of: ARTICLE, YOUTUBE, LINK.
-Output ONLY the JSON object. No other text.`
+suggestedResources: 3-4 items. type must be ARTICLE, YOUTUBE, or LINK. Output ONLY the JSON.`
 
   let userContent: string
 
   if (fileExt === ".pdf") {
     const pdfText = await extractPdfText(filePath)
-    userContent = `Analyze this academic PDF titled "${title}" for course ${courseCode}:\n\n${pdfText.slice(0, 50000)}\n\nReturn the JSON only.`
+    userContent = `Summarize this academic PDF titled "${title}" (course: ${courseCode}):\n\n${pdfText.slice(0, 18000)}\n\nJSON only.`
   } else if ([".txt", ".md"].includes(fileExt)) {
     const text = fs.readFileSync(filePath, "utf-8")
-    userContent = `Analyze this academic material titled "${title}" for course ${courseCode}:\n\n${text.slice(0, 50000)}\n\nReturn the JSON only.`
+    userContent = `Summarize this academic material titled "${title}" (course: ${courseCode}):\n\n${text.slice(0, 18000)}\n\nJSON only.`
   } else {
-    userContent = `Generate a study resource summary for a file titled "${title}" for course ${courseCode}. File type: ${fileExt}. Return the JSON only.`
+    userContent = `Generate a study summary for "${title}" (course: ${courseCode}, type: ${fileExt}). JSON only.`
   }
 
   const response = await nvidia.chat.completions.create({
-    model: "meta/llama-3.3-70b-instruct",
+    model: "meta/llama-3.1-8b-instruct",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userContent },
     ],
-    max_tokens: 2048,
+    max_tokens: 1024,
     temperature: 0.1,
   })
 
