@@ -339,6 +339,11 @@ const CSS = `
 }
 .mt-action-btn.summarize:hover { background: oklch(0.88 0.07 290 / 0.7); }
 .mt-action-btn.summarize:disabled { opacity: .5; cursor: not-allowed; }
+.mt-action-btn.download-summary {
+  background: oklch(0.93 0.05 145 / 0.5); color: oklch(0.38 0.18 145);
+  border-color: oklch(0.82 0.08 145 / 0.4);
+}
+.mt-action-btn.download-summary:hover { background: oklch(0.88 0.07 145 / 0.7); }
 .mt-action-btn svg { width: 13px; height: 13px; }
 
 .mt-icon-btn {
@@ -545,6 +550,98 @@ export default function MaterialsPage() {
     const res = await fetch(`/api/materials/${id}`, { method: "DELETE" })
     if (res.ok) setMaterials((prev) => prev.filter((m) => m.id !== id))
     else setError("Failed to delete material.")
+  }
+
+  // ── Download Summary ──────────────────────────────────────────────────────
+  function downloadSummary(mat: Material) {
+    if (!mat.summary) return
+    const terms = mat.summary.keyTerms
+      ? mat.summary.keyTerms.split(",").map((t) => `<span class="term">${t.trim()}</span>`).join("")
+      : ""
+    const resources = mat.suggestedResources.length > 0
+      ? mat.suggestedResources.map((r) => `<a href="${r.url}" class="resource" target="_blank">
+          <span class="res-badge ${r.type.toLowerCase()}">${r.type}</span>
+          <span class="res-title">${r.title}</span>
+          <span class="res-source">${r.sourceName}</span>
+        </a>`).join("")
+      : ""
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Summary – ${mat.title}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f9fc;color:#1a1d23;padding:2rem}
+  .page{max-width:780px;margin:0 auto;background:#fff;border-radius:1rem;box-shadow:0 4px 24px rgba(0,0,0,.08);overflow:hidden}
+  .header{background:linear-gradient(135deg,#1e1b4b 0%,#312e81 60%,#4338ca 100%);padding:2rem 2.5rem;color:#fff}
+  .badge{display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:.2rem .75rem;font-size:.72rem;font-weight:700;letter-spacing:.05em;margin-bottom:.75rem}
+  .header h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
+  .header .meta{font-size:.8rem;opacity:.7}
+  .body{padding:2rem 2.5rem;display:flex;flex-direction:column;gap:1.5rem}
+  .section-title{font-size:.7rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#6366f1;margin-bottom:.6rem}
+  .ai-box{background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:1px solid #c7d2fe;border-radius:.75rem;padding:1.25rem}
+  .ai-box .section-title{color:#4338ca}
+  .ai-box p{font-size:.9rem;line-height:1.7;color:#3730a3}
+  .notes-box{background:#f8f9fc;border:1px solid #e5e7eb;border-radius:.75rem;padding:1.25rem;font-size:.88rem;line-height:1.8;white-space:pre-wrap;color:#374151}
+  .terms{display:flex;flex-wrap:wrap;gap:.4rem}
+  .term{background:#f0f9ff;border:1px solid #bae6fd;border-radius:.5rem;padding:.3rem .7rem;font-size:.78rem;font-weight:600;color:#0369a1}
+  .resources{display:flex;flex-direction:column;gap:.5rem}
+  .resource{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:.65rem;text-decoration:none;color:inherit}
+  .resource:hover{background:#f0f9ff;border-color:#bae6fd}
+  .res-badge{font-size:.65rem;font-weight:800;letter-spacing:.05em;padding:.2rem .55rem;border-radius:.35rem;flex-shrink:0}
+  .res-badge.article{background:#dbeafe;color:#1d4ed8}
+  .res-badge.youtube{background:#fee2e2;color:#dc2626}
+  .res-badge.link{background:#dcfce7;color:#16a34a}
+  .res-title{font-size:.84rem;font-weight:600;flex:1}
+  .res-source{font-size:.75rem;color:#6b7280}
+  .footer{border-top:1px solid #f3f4f6;padding:1rem 2.5rem;font-size:.72rem;color:#9ca3af;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="badge">AI SUMMARY · EDUCORE</div>
+    <h1>${mat.title}</h1>
+    <div class="meta">${mat.courseCode} · Generated ${new Date().toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" })}</div>
+  </div>
+  <div class="body">
+    <div>
+      <div class="ai-box">
+        <div class="section-title">✨ Quick Summary</div>
+        <p>${mat.summary.quickSummary}</p>
+      </div>
+    </div>
+    ${mat.summary.detailedNotes ? `<div>
+      <div class="section-title">📖 Detailed Notes</div>
+      <div class="notes-box">${mat.summary.detailedNotes}</div>
+    </div>` : ""}
+    ${terms ? `<div>
+      <div class="section-title">🔑 Key Terms</div>
+      <div class="terms">${terms}</div>
+    </div>` : ""}
+    ${resources ? `<div>
+      <div class="section-title">🔗 Suggested Resources</div>
+      <div class="resources">${resources}</div>
+    </div>` : ""}
+  </div>
+  <div class="footer">
+    <span>EduCore AI Summary</span>
+    <span>${mat.courseCode} · ${mat.title}</span>
+  </div>
+</div>
+</body>
+</html>`
+
+    const blob = new Blob([html], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `summary-${mat.courseCode}-${mat.title.replace(/\s+/g, "-").toLowerCase()}.html`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const pendingCount   = fileEntries.filter((e) => e.status === "pending").length
@@ -918,7 +1015,15 @@ export default function MaterialsPage() {
                       {mat.summary && (
                         <>
                           <div className="mt-ai-box">
-                            <div className="mt-ai-box-title">✨ AI Quick Summary</div>
+                            <div className="mt-ai-box-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: ".5rem" }}>
+                              <span>✨ AI Quick Summary</span>
+                              <button className="mt-action-btn download-summary" onClick={() => downloadSummary(mat)} title="Download summary as HTML">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13 }}>
+                                  <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+                                </svg>
+                                Download Summary
+                              </button>
+                            </div>
                             <p className="mt-body-text">{mat.summary.quickSummary}</p>
                           </div>
 

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic"
 
 import type { NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/db/prisma"
 import { verifyPassword, setSession } from "@/lib/auth/session"
 
@@ -25,10 +26,27 @@ export async function POST(request: NextRequest) {
 
   // ── Database lookup ─────────────────────────────────────────────────────────
 
-  const user = await prisma.user.findUnique({
-    where: { email: String(email) },
-    select: { id: true, password: true, role: true, fullName: true },
-  })
+  let user: { id: number; password: string; role: "STUDENT" | "ADMIN" | "LECTURER"; fullName: string } | null = null
+
+  try {
+    user = await prisma.user.findUnique({
+      where: { email: String(email) },
+      select: { id: true, password: true, role: true, fullName: true },
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return Response.json(
+        {
+          error: "Database is unavailable. Please check your connection and try again.",
+          code: "DB_UNAVAILABLE",
+        },
+        { status: 503 },
+      )
+    }
+
+    console.error("Login query failed", error)
+    return Response.json({ error: "Internal server error." }, { status: 500 })
+  }
 
   if (!user || !verifyPassword(String(password), user.password)) {
     return Response.json({ error: "Invalid email or password." }, { status: 401 })
