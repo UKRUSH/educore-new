@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic"
+export const maxDuration = 60 // seconds — PDF fetch + AI call needs time
 
 import type { NextRequest } from "next/server"
 import path from "path"
@@ -98,6 +99,9 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    if (!process.env.NVIDIA_API_KEY)
+      return Response.json({ error: "AI service is not configured. Set NVIDIA_API_KEY in Netlify environment variables." }, { status: 503 })
+
     const session = await getSession()
     if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
