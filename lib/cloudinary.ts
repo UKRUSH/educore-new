@@ -18,3 +18,36 @@ export function uploadBuffer(
     stream.end(buffer)
   })
 }
+
+/**
+ * Fetch a Cloudinary-hosted file as a Buffer.
+ * If the direct CDN URL returns 401/403 (raw/PDF resources are access-restricted
+ * by default), falls back to private_download_url which routes through
+ * api.cloudinary.com with a signed request — always works with valid credentials.
+ */
+export async function fetchCloudinaryBuffer(fileUrl: string): Promise<Buffer> {
+  // Try direct CDN fetch first (works for public image resources)
+  const res = await fetch(fileUrl)
+  if (res.ok) return Buffer.from(await res.arrayBuffer())
+
+  if (res.status !== 401 && res.status !== 403)
+    throw new Error(`Failed to fetch file from storage: ${res.status}`)
+
+  // Parse: https://res.cloudinary.com/{cloud}/{resource_type}/upload/v{ver}/{public_id}.{ext}
+  const match = fileUrl.match(
+    /res\.cloudinary\.com\/[^/]+\/(image|raw|video)\/upload\/(?:v\d+\/)?(.+?)(?:\.(\w+))?$/,
+  )
+  if (!match) throw new Error(`Cannot parse Cloudinary URL: ${fileUrl}`)
+
+  const resourceType = match[1] as "image" | "raw" | "video"
+  const publicId     = match[2]
+  const format       = match[3] ?? ""
+
+  const downloadUrl = cloudinary.utils.private_download_url(publicId, format, {
+    resource_type: resourceType,
+  })
+
+  const authRes = await fetch(downloadUrl)
+  if (!authRes.ok) throw new Error(`Cloudinary authenticated download failed: ${authRes.status}`)
+  return Buffer.from(await authRes.arrayBuffer())
+}

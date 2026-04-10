@@ -378,6 +378,7 @@ model FileAsset {
   fileSize      Int
   fileUrl       String
   fileType      String
+  extractedText String?  @db.Text
   userId        Int
   materialId    Int?     @unique
   achievementId Int?     @unique
