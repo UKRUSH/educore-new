@@ -791,7 +791,7 @@ export default function AcademicPage() {
                     <label>Subject Name *</label>
                     <input className={`ah-input${subjFieldErrors.subjectName ? " err" : ""}`}
                       type="text" value={subjForm.subjectName}
-                      onChange={e => handleSubjFormChange("subjectName", e.target.value)}
+                      onChange={e => handleSubjFormChange("subjectName", e.target.value.replace(/[^a-zA-Z\s]/g, ""))}
                       placeholder="e.g. Programming Fundamentals" />
                     {subjFieldErrors.subjectName && (
                       <div className="ah-field-err">

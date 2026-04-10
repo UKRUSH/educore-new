@@ -646,7 +646,11 @@ export default function MentorProfilePage() {
       const res = await fetch(url, {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...sessForm, subject: fullSubject }),
+        body: JSON.stringify({
+          ...sessForm,
+          subject: fullSubject,
+          date: sessForm.date ? new Date(sessForm.date).toISOString() : sessForm.date,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setSessErr(data.error ?? "Failed to save session."); return }
