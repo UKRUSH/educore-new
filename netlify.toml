@@ -9,8 +9,5 @@
   CLOUDINARY_API_KEY = "659865367139194"
   # Set CLOUDINARY_API_SECRET in Netlify dashboard (never commit secrets)
 
-[functions]
-  timeout = 60
-
 [[plugins]]
   package = "@netlify/plugin-nextjs"
