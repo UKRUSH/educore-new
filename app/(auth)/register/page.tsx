@@ -268,7 +268,7 @@ function ErrMsg({ msg }: { msg: string }) {
   )
 }
 
-function vFullName(v: string)   { if (!v.trim()) return "Full name is required."; if (v.trim().length < 2) return "Name must be at least 2 characters."; return "" }
+function vFullName(v: string)   { if (!v.trim()) return "Full name is required."; if (v.trim().length < 2) return "Name must be at least 2 characters."; if (/\d/.test(v)) return "Full name must not contain numbers."; return "" }
 function vStudentId(v: string)  { if (!v.trim()) return "Student ID is required."; if (v.trim().length < 3) return "Enter a valid student ID."; return "" }
 function vEmail(v: string)      { if (!v.trim()) return "Email is required."; if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Enter a valid email address."; return "" }
 function vPassword(v: string)   { if (!v) return "Password is required."; if (v.length < 8) return "Password must be at least 8 characters."; return "" }
@@ -484,7 +484,7 @@ export default function RegisterPage() {
                   className={`rc-input${errs.fullName ? " invalid" : touched.fullName && !errs.fullName ? " valid" : ""}`}
                   type="text" placeholder="Ahmad bin Abdullah" autoComplete="name"
                   value={fullName}
-                  onChange={e => { setFullName(e.target.value); setError("") }}
+                  onChange={e => { setFullName(e.target.value.replace(/[0-9]/g, "")); setError("") }}
                   onBlur={() => touch("fullName")}
                 />
               </div>
