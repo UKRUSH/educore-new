@@ -1,8 +1,6 @@
 export const dynamic = "force-dynamic"
 
 import type { NextRequest } from "next/server"
-import fs from "fs"
-import path from "path"
 import { getSession } from "@/lib/auth/session"
 import { prisma } from "@/lib/db/prisma"
 
@@ -22,12 +20,6 @@ export async function DELETE(
   })
   if (!material || material.userId !== session.userId)
     return Response.json({ error: "Not found." }, { status: 404 })
-
-  // Delete file from disk if exists
-  if (material.fileAsset?.fileUrl) {
-    const filePath = path.join(process.cwd(), "public", material.fileAsset.fileUrl)
-    fs.unlink(filePath, () => {})
-  }
 
   await prisma.studyMaterial.delete({ where: { id: matId } })
   return new Response(null, { status: 204 })

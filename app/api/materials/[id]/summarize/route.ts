@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic"
 
 import type { NextRequest } from "next/server"
-import fs from "fs"
 import path from "path"
 import { getSession } from "@/lib/auth/session"
 import { prisma } from "@/lib/db/prisma"
@@ -13,18 +12,29 @@ interface SummaryResult {
   suggestedResources: Array<{ title: string; sourceName: string; url: string; type: "ARTICLE" | "YOUTUBE" | "LINK" }>
 }
 
-async function extractPdfText(filePath: string): Promise<string> {
-  const buffer = fs.readFileSync(filePath)
-  // Use the internal lib directly — avoids pdf-parse's debug mode which reads
-  // a missing test file when module.parent is null in Next.js
+async function extractPdfText(buffer: Buffer): Promise<string> {
   const pdfParse = (await import("pdf-parse/lib/pdf-parse.js" as string)).default
   const data = await pdfParse(buffer)
   return data.text as string
 }
 
+async function fetchFileBuffer(fileUrl: string): Promise<Buffer> {
+  // Cloudinary URLs are absolute https://; legacy local paths start with /uploads/
+  if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+    const res = await fetch(fileUrl)
+    if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`)
+    return Buffer.from(await res.arrayBuffer())
+  }
+  // Fallback: local file (legacy)
+  const fs = await import("fs")
+  const localPath = path.join(process.cwd(), "public", fileUrl)
+  if (!fs.existsSync(localPath)) throw new Error("File not found on server.")
+  return fs.readFileSync(localPath)
+}
+
 async function summarizeWithNvidia(
   fileExt: string,
-  filePath: string,
+  fileBuffer: Buffer,
   title: string,
   courseCode: string,
 ): Promise<SummaryResult> {
@@ -50,10 +60,10 @@ suggestedResources: 3-4 items. type must be ARTICLE, YOUTUBE, or LINK. Output ON
   let userContent: string
 
   if (fileExt === ".pdf") {
-    const pdfText = await extractPdfText(filePath)
+    const pdfText = await extractPdfText(fileBuffer)
     userContent = `Summarize this academic PDF titled "${title}" (course: ${courseCode}):\n\n${pdfText.slice(0, 18000)}\n\nJSON only.`
   } else if ([".txt", ".md"].includes(fileExt)) {
-    const text = fs.readFileSync(filePath, "utf-8")
+    const text = fileBuffer.toString("utf-8")
     userContent = `Summarize this academic material titled "${title}" (course: ${courseCode}):\n\n${text.slice(0, 18000)}\n\nJSON only.`
   } else {
     userContent = `Generate a study summary for "${title}" (course: ${courseCode}, type: ${fileExt}). JSON only.`
@@ -71,7 +81,6 @@ suggestedResources: 3-4 items. type must be ARTICLE, YOUTUBE, or LINK. Output ON
 
   const raw = response.choices[0]?.message?.content ?? ""
 
-  // Extract the JSON object from wherever it appears in the response
   const start = raw.indexOf("{")
   const end = raw.lastIndexOf("}")
   if (start === -1 || end === -1) {
@@ -79,7 +88,6 @@ suggestedResources: 3-4 items. type must be ARTICLE, YOUTUBE, or LINK. Output ON
   }
   const extracted = raw.slice(start, end + 1)
 
-  // jsonrepair handles single quotes, unquoted keys, trailing commas, control chars, etc.
   const repaired = jsonrepair(extracted)
   return JSON.parse(repaired) as SummaryResult
 }
@@ -106,15 +114,19 @@ export async function POST(
     if (!material.fileAsset)
       return Response.json({ error: "No file attached to this material." }, { status: 400 })
 
-    const filePath = path.join(process.cwd(), "public", material.fileAsset.fileUrl)
-    if (!fs.existsSync(filePath))
-      return Response.json({ error: "File not found on server." }, { status: 404 })
+    let fileBuffer: Buffer
+    try {
+      fileBuffer = await fetchFileBuffer(material.fileAsset.fileUrl)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return Response.json({ error: msg }, { status: 404 })
+    }
 
     const fileExt = path.extname(material.fileAsset.fileName).toLowerCase()
 
     let result: SummaryResult
     try {
-      result = await summarizeWithNvidia(fileExt, filePath, material.title, material.courseCode)
+      result = await summarizeWithNvidia(fileExt, fileBuffer, material.title, material.courseCode)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error("NVIDIA summarization failed:", msg)
