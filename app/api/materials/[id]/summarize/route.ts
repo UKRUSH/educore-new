@@ -18,18 +18,19 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   return data.text as string
 }
 
+class LegacyFileError extends Error {}
+
 async function fetchFileBuffer(fileUrl: string): Promise<Buffer> {
-  // Cloudinary URLs are absolute https://; legacy local paths start with /uploads/
+  // Cloudinary / any absolute URL
   if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
     const res = await fetch(fileUrl)
-    if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`)
+    if (!res.ok) throw new Error(`Failed to fetch file from storage: ${res.status}`)
     return Buffer.from(await res.arrayBuffer())
   }
-  // Fallback: local file (legacy)
-  const fs = await import("fs")
-  const localPath = path.join(process.cwd(), "public", fileUrl)
-  if (!fs.existsSync(localPath)) throw new Error("File not found on server.")
-  return fs.readFileSync(localPath)
+  // Legacy local path — file no longer exists on server
+  throw new LegacyFileError(
+    "This file was uploaded before cloud storage was enabled and is no longer available. Please delete and re-upload the material.",
+  )
 }
 
 async function summarizeWithNvidia(
@@ -119,7 +120,8 @@ export async function POST(
       fileBuffer = await fetchFileBuffer(material.fileAsset.fileUrl)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      return Response.json({ error: msg }, { status: 404 })
+      const status = err instanceof LegacyFileError ? 410 : 502
+      return Response.json({ error: msg }, { status })
     }
 
     const fileExt = path.extname(material.fileAsset.fileName).toLowerCase()
