@@ -1154,9 +1154,9 @@ export default function ClubsPage() {
                     {/* Available days */}
                     <div className="cb-field">
                       <label className="cb-lbl">Available days <span style={{ fontWeight: 400, opacity: .6, textTransform: "none" }}>(optional)</span></label>
-                      <input className="cb-inp" placeholder="e.g. Monday, Wednesday, Friday"
+                      <input type="text" className="cb-inp" placeholder="e.g. Monday, Wednesday, Friday"
                         value={applyForm.availableDays}
-                        onChange={(e) => setApplyForm((p) => ({ ...p, availableDays: e.target.value }))} />
+                        onChange={(e) => setApplyForm((p) => ({ ...p, availableDays: e.target.value.replace(/[^a-zA-Z\s,]/g, "") }))} />
                     </div>
 
                     {/* Actions */}
@@ -1282,9 +1282,9 @@ export default function ClubsPage() {
 
                       <div className="cb-field">
                         <label className="cb-lbl">Available days <span style={{ fontWeight: 400, opacity: .6, textTransform: "none" }}>(optional)</span></label>
-                        <input className="cb-inp" placeholder="e.g. Monday, Wednesday, Friday"
+                        <input type="text" className="cb-inp" placeholder="e.g. Monday, Wednesday, Friday"
                           value={editForm.availableDays}
-                          onChange={(e) => setEditForm((p) => ({ ...p, availableDays: e.target.value }))} />
+                          onChange={(e) => setEditForm((p) => ({ ...p, availableDays: e.target.value.replace(/[^a-zA-Z\s,]/g, "") }))} />
                       </div>
 
                       <div className="cb-form-actions">

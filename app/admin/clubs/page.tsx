@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Club = {
@@ -170,6 +170,40 @@ const CSS = `
 .ac-confirm-text { font-size:.875rem; color:var(--muted-foreground); line-height:1.6; }
 .ac-confirm-text strong { color:var(--foreground); }
 @keyframes acSpin{to{transform:rotate(360deg)}}.ac-spin{animation:acSpin .8s linear infinite;}
+
+/* QR Attendance modal */
+.ac-qr-btn { padding:.42rem .8rem; border-radius:.6rem;
+  background:oklch(0.93 0.06 250 / .5); border:1.5px solid oklch(0.82 0.08 250);
+  font-size:.75rem; font-weight:700; color:oklch(0.42 0.18 250); cursor:pointer; transition:all .15s; }
+.ac-qr-btn:hover { background:oklch(0.88 0.08 250 / .6); }
+.ac-qr-modal { background:var(--card); border:1px solid var(--border); border-radius:1.25rem; width:100%; max-width:400px;
+  box-shadow:0 24px 80px rgba(0,0,0,.22); max-height:92vh; overflow-y:auto; animation:acSlideUp .28s cubic-bezier(.22,1,.36,1); }
+.ac-qr-modal::-webkit-scrollbar{width:4px}.ac-qr-modal::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.ac-qr-top { height:5px; border-radius:1.25rem 1.25rem 0 0; flex-shrink:0; background:linear-gradient(135deg,oklch(0.62 0.2 260),oklch(0.5 0.22 265)); }
+.ac-qr-body { padding:1.5rem; display:flex; flex-direction:column; align-items:center; gap:1.1rem; }
+.ac-qr-club-name { font-size:1rem; font-weight:900; color:var(--foreground); letter-spacing:-.02em; text-align:center; }
+.ac-qr-label-row { display:flex; gap:.5rem; width:100%; }
+.ac-qr-label-inp { flex:1; border:1.5px solid var(--border); background:var(--background); border-radius:.65rem;
+  padding:.55rem .85rem; font-size:.875rem; color:var(--foreground); outline:none; transition:border-color .2s; }
+.ac-qr-label-inp:focus { border-color:oklch(0.62 0.2 260); box-shadow:0 0 0 3px oklch(0.62 0.2 260/.12); }
+.ac-qr-gen-btn { padding:.55rem 1rem; border-radius:.65rem;
+  background:linear-gradient(135deg,oklch(0.62 0.2 260),oklch(0.5 0.22 265)); color:#fff;
+  font-size:.8rem; font-weight:800; border:none; cursor:pointer; white-space:nowrap;
+  transition:opacity .18s; display:flex; align-items:center; gap:.35rem; }
+.ac-qr-gen-btn:disabled { opacity:.5; cursor:not-allowed; }
+.ac-qr-img-wrap { width:260px; height:260px; border-radius:1rem; overflow:hidden; border:2px solid var(--border);
+  display:flex; align-items:center; justify-content:center; background:var(--muted); }
+.ac-qr-img-wrap img { width:100%; height:100%; object-fit:contain; }
+.ac-qr-timer-bar { width:260px; height:6px; border-radius:999px; background:var(--muted); overflow:hidden; }
+.ac-qr-timer-fill { height:100%; border-radius:999px; transition:width 1s linear, background .5s; }
+.ac-qr-timer-text { font-size:.78rem; font-weight:700; color:var(--muted-foreground); }
+.ac-qr-refresh-btn { padding:.5rem 1.1rem; border-radius:.65rem;
+  background:var(--muted); border:1.5px solid var(--border);
+  font-size:.78rem; font-weight:700; color:var(--foreground); cursor:pointer; transition:all .15s; }
+.ac-qr-refresh-btn:hover { background:var(--accent); }
+.ac-qr-err { background:oklch(0.97 0.05 25/.5); border:1px solid oklch(0.88 0.1 25/.4); border-radius:.65rem;
+  padding:.55rem .85rem; font-size:.8rem; color:oklch(0.5 0.22 25); text-align:center; width:100%; }
+.ac-qr-empty { display:flex; flex-direction:column; align-items:center; gap:.5rem; color:var(--muted-foreground); font-size:.85rem; padding:1rem; }
 `
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -186,6 +220,15 @@ export default function AdminClubsPage() {
   const [formErr, setFormErr]   = useState("")
   const [saving, setSaving]     = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // QR Attendance state
+  const [qrClub, setQrClub]         = useState<Club | null>(null)
+  const [qrLabel, setQrLabel]        = useState("Club Meeting")
+  const [qrData, setQrData]          = useState<{ qrDataUrl: string; expiresAt: string } | null>(null)
+  const [qrLoading, setQrLoading]    = useState(false)
+  const [qrError, setQrError]        = useState("")
+  const [qrSecondsLeft, setQrSecondsLeft] = useState(0)
+  const qrTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -232,6 +275,54 @@ export default function AdminClubsPage() {
     if (res.ok) { setClubs((p) => p.filter((c) => c.id !== deleteClub.id)); setDeleteClub(null) }
     setDeleting(false)
   }
+
+  // ── QR helpers ────────────────────────────────────────────────────────────
+  function clearQrTimer() {
+    if (qrTimerRef.current) { clearInterval(qrTimerRef.current); qrTimerRef.current = null }
+  }
+
+  function startQrCountdown(expiresAt: string) {
+    clearQrTimer()
+    const tick = () => {
+      const secs = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
+      setQrSecondsLeft(secs)
+      if (secs === 0) clearQrTimer()
+    }
+    tick()
+    qrTimerRef.current = setInterval(tick, 1000)
+  }
+
+  async function generateQr(club: Club, label: string) {
+    setQrLoading(true); setQrError("")
+    const res = await fetch(`/api/admin/clubs/${club.id}/attendance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setQrError(data.error ?? "Failed to generate QR."); setQrLoading(false); return }
+    setQrData({ qrDataUrl: data.qrDataUrl, expiresAt: data.expiresAt })
+    startQrCountdown(data.expiresAt)
+    setQrLoading(false)
+  }
+
+  function openQr(club: Club) {
+    clearQrTimer()
+    setQrClub(club); setQrData(null); setQrError(""); setQrLabel("Club Meeting"); setQrSecondsLeft(0)
+  }
+
+  function closeQr() { clearQrTimer(); setQrClub(null); setQrData(null); setQrError("") }
+
+  // Auto-refresh when timer hits 0 and modal is open
+  useEffect(() => {
+    if (qrClub && qrData && qrSecondsLeft === 0 && !qrLoading) {
+      generateQr(qrClub, qrLabel)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrSecondsLeft])
+
+  // Cleanup on unmount
+  useEffect(() => () => clearQrTimer(), [])
 
   const totalPending = clubs.reduce((s, c) => s + c._count.applications, 0)
 
@@ -352,6 +443,10 @@ export default function AdminClubsPage() {
                   </div>
                   <div className="ac-card-footer">
                     <button className="ac-edit-btn" onClick={() => openEdit(club)}>✎ Edit</button>
+                    <button className="ac-qr-btn" onClick={() => openQr(club)}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{display:"inline",marginRight:".25rem"}}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="17" y="17" width="3" height="3"/><path d="M14 17h3m0-3h3"/></svg>
+                      QR
+                    </button>
                     <button className="ac-del-btn" onClick={() => setDeleteClub(club)}>✕ Delete</button>
                   </div>
                 </div>
@@ -420,6 +515,96 @@ export default function AdminClubsPage() {
                   </button>
                   <button className="ac-cancel-btn" onClick={() => { setShowAdd(false); setEditClub(null) }}>Cancel</button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* QR Attendance Modal */}
+        {qrClub && (
+          <div className="ac-backdrop" onClick={closeQr}>
+            <div className="ac-qr-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="ac-qr-top" />
+              <div className="ac-modal-hdr">
+                <span className="ac-modal-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{display:"inline",marginRight:".4rem",verticalAlign:"middle"}}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="17" y="17" width="3" height="3"/><path d="M14 17h3m0-3h3"/></svg>
+                  Attendance QR
+                </span>
+                <button className="ac-modal-close" onClick={closeQr}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div className="ac-qr-body">
+                <div className="ac-qr-club-name">{qrClub.name}</div>
+
+                {/* Label + generate */}
+                <div className="ac-qr-label-row">
+                  <input
+                    className="ac-qr-label-inp"
+                    placeholder="Session label (e.g. Club Meeting)"
+                    value={qrLabel}
+                    onChange={(e) => setQrLabel(e.target.value)}
+                  />
+                  <button
+                    className="ac-qr-gen-btn"
+                    disabled={qrLoading}
+                    onClick={() => generateQr(qrClub, qrLabel)}
+                  >
+                    {qrLoading
+                      ? <svg className="ac-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+                      : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    }
+                    {qrData ? "Refresh" : "Generate"}
+                  </button>
+                </div>
+
+                {qrError && <div className="ac-qr-err">{qrError}</div>}
+
+                {!qrData && !qrLoading && (
+                  <div className="ac-qr-empty">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{opacity:.3}}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="17" y="17" width="3" height="3"/><path d="M14 17h3m0-3h3"/></svg>
+                    <span>Enter a session label and click Generate</span>
+                  </div>
+                )}
+
+                {qrData && (
+                  <>
+                    {/* QR image */}
+                    <div className="ac-qr-img-wrap">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={qrData.qrDataUrl} alt="Attendance QR Code" />
+                    </div>
+
+                    {/* Countdown timer bar */}
+                    {(() => {
+                      const total = 15 * 60
+                      const pct   = Math.round((qrSecondsLeft / total) * 100)
+                      const mins  = Math.floor(qrSecondsLeft / 60)
+                      const secs  = qrSecondsLeft % 60
+                      const color = qrSecondsLeft > 300
+                        ? "oklch(0.55 0.2 145)"
+                        : qrSecondsLeft > 60
+                        ? "oklch(0.6 0.2 55)"
+                        : "oklch(0.55 0.22 25)"
+                      return (
+                        <>
+                          <div className="ac-qr-timer-bar">
+                            <div className="ac-qr-timer-fill" style={{ width:`${pct}%`, background:color }} />
+                          </div>
+                          <div className="ac-qr-timer-text" style={{ color }}>
+                            {qrSecondsLeft > 0
+                              ? `Refreshes in ${mins}:${String(secs).padStart(2,"0")}`
+                              : "Refreshing…"}
+                          </div>
+                        </>
+                      )
+                    })()}
+
+                    <p style={{fontSize:".75rem",color:"var(--muted-foreground)",textAlign:"center",margin:0}}>
+                      QR auto-refreshes every 15 minutes. Students scan to mark attendance.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
