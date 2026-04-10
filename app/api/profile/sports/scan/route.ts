@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic"
 
-import { writeFile, mkdir } from "fs/promises"
-import { join } from "path"
 import { getSession } from "@/lib/auth/session"
+import { uploadBuffer } from "@/lib/cloudinary"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
 const MAX_SIZE_BYTES = 5 * 1024 * 1024
@@ -37,15 +36,21 @@ export async function POST(request: Request) {
   if (file.size > MAX_SIZE_BYTES)
     return Response.json({ error: "Image must be under 5 MB." }, { status: 400 })
 
-  // ── Save locally ──────────────────────────────────────────────────────────
+  // ── Upload to Cloudinary ──────────────────────────────────────────────────
   const bytes  = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
-  const ext      = file.type.split("/")[1].replace("jpeg", "jpg")
-  const filename = `${session.userId}-${Date.now()}.${ext}`
-  const uploadDir = join(process.cwd(), "public", "uploads", "certificates")
-  await mkdir(uploadDir, { recursive: true })
-  await writeFile(join(uploadDir, filename), buffer)
-  const fileUrl = `/uploads/certificates/${filename}`
+
+  let fileUrl: string
+  try {
+    const result = await uploadBuffer(buffer, {
+      folder: "educore/certificates",
+      resource_type: "image",
+      public_id: `cert-${session.userId}-${Date.now()}`,
+    })
+    fileUrl = result.secure_url
+  } catch {
+    return Response.json({ error: "Failed to upload certificate." }, { status: 500 })
+  }
 
   // ── Call NVIDIA vision model via raw fetch ────────────────────────────────
   // Image was resized client-side to ≤800px so base64 stays well under 180KB

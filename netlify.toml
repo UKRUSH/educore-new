@@ -5,6 +5,9 @@
 [build.environment]
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
+  CLOUDINARY_CLOUD_NAME = "dxjrr3lj1"
+  CLOUDINARY_API_KEY = "659865367139194"
+  # Set CLOUDINARY_API_SECRET in Netlify dashboard (never commit secrets)
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
