@@ -524,11 +524,17 @@ export default function MaterialsPage() {
   // ── Summarize ─────────────────────────────────────────────────────────────
   async function summarizeMaterial(id: number) {
     setSummarizing(id); setError("")
-    const res = await fetch(`/api/materials/${id}/summarize`, { method: "POST" })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? "Summarization failed."); setSummarizing(null); return }
-    setMaterials((prev) => prev.map((m) => m.id === id ? { ...m, isSummarized: true, summary: data.summary, suggestedResources: data.suggestedResources ?? [] } : m))
-    setExpanded(id); setSummarizing(null)
+    try {
+      const res = await fetch(`/api/materials/${id}/summarize`, { method: "POST" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data.error ?? `Summarization failed (${res.status}).`); setSummarizing(null); return }
+      setMaterials((prev) => prev.map((m) => m.id === id ? { ...m, isSummarized: true, summary: data.summary, suggestedResources: data.suggestedResources ?? [] } : m))
+      setExpanded(id)
+    } catch {
+      setError("Network error. Please try again.")
+    } finally {
+      setSummarizing(null)
+    }
   }
 
   async function summarizeAll() {
@@ -537,9 +543,11 @@ export default function MaterialsPage() {
     setSummarizingAll(true); setError(""); setSummarizeAllProgress({ done: 0, total: pending.length })
     for (let i = 0; i < pending.length; i++) {
       const mat = pending[i]; setSummarizing(mat.id)
-      const res = await fetch(`/api/materials/${mat.id}/summarize`, { method: "POST" })
-      const data = await res.json()
-      if (res.ok) setMaterials((prev) => prev.map((m) => m.id === mat.id ? { ...m, isSummarized: true, summary: data.summary, suggestedResources: data.suggestedResources ?? [] } : m))
+      try {
+        const res = await fetch(`/api/materials/${mat.id}/summarize`, { method: "POST" })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok) setMaterials((prev) => prev.map((m) => m.id === mat.id ? { ...m, isSummarized: true, summary: data.summary, suggestedResources: data.suggestedResources ?? [] } : m))
+      } catch { /* continue to next */ }
       setSummarizeAllProgress({ done: i + 1, total: pending.length })
     }
     setSummarizing(null); setSummarizingAll(false)
