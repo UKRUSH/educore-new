@@ -5,67 +5,61 @@ import { join } from "path"
 import { getSession } from "@/lib/auth/session"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
-const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
+const MAX_SIZE_BYTES = 5 * 1024 * 1024
+
+function positionToMarks(position: string | null): number {
+  if (!position) return 0.5
+  const p = position.toLowerCase()
+  if (/1st|first|champion|gold|winner/.test(p)) return 3
+  if (/2nd|second|runner.?up|silver/.test(p))   return 2
+  if (/3rd|third|bronze/.test(p))               return 1
+  return 0.5
+}
 
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey || apiKey === "your-anthropic-api-key-here") {
-    return Response.json({ error: "ANTHROPIC_API_KEY is not configured in .env" }, { status: 503 })
-  }
+  const apiKey = process.env.NVIDIA_API_KEY
+  if (!apiKey)
+    return Response.json({ error: "NVIDIA_API_KEY is not configured." }, { status: 503 })
 
-  // ── Parse uploaded file ───────────────────────────────────────────────────
-
+  // ── Parse file ────────────────────────────────────────────────────────────
   let formData: FormData
-  try {
-    formData = await request.formData()
-  } catch {
-    return Response.json({ error: "Invalid form data." }, { status: 400 })
-  }
+  try { formData = await request.formData() }
+  catch { return Response.json({ error: "Invalid form data." }, { status: 400 }) }
 
   const file = formData.get("image") as File | null
-  if (!file || typeof file === "string") {
+  if (!file || typeof file === "string")
     return Response.json({ error: "No image file provided." }, { status: 400 })
-  }
-
-  if (!ALLOWED_TYPES.includes(file.type)) {
+  if (!ALLOWED_TYPES.includes(file.type))
     return Response.json({ error: "Only JPG, PNG, and WebP images are supported." }, { status: 400 })
-  }
-
-  if (file.size > MAX_SIZE_BYTES) {
+  if (file.size > MAX_SIZE_BYTES)
     return Response.json({ error: "Image must be under 5 MB." }, { status: 400 })
-  }
 
-  // ── Save file to public/uploads/certificates/ ─────────────────────────────
-
-  const bytes = await file.arrayBuffer()
+  // ── Save locally ──────────────────────────────────────────────────────────
+  const bytes  = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
-  const base64 = buffer.toString("base64")
-
-  const ext = file.type.split("/")[1].replace("jpeg", "jpg")
+  const ext      = file.type.split("/")[1].replace("jpeg", "jpg")
   const filename = `${session.userId}-${Date.now()}.${ext}`
   const uploadDir = join(process.cwd(), "public", "uploads", "certificates")
   await mkdir(uploadDir, { recursive: true })
   await writeFile(join(uploadDir, filename), buffer)
   const fileUrl = `/uploads/certificates/${filename}`
 
-  // ── Call Claude vision API ────────────────────────────────────────────────
+  // ── Call NVIDIA vision model via raw fetch ────────────────────────────────
+  // Image was resized client-side to ≤800px so base64 stays well under 180KB
+  const base64    = buffer.toString("base64")
+  const mediaType = file.type === "image/jpg" ? "image/jpeg" : file.type
+  const imageUrl  = `data:${mediaType};base64,${base64}`
 
-  const prompt = `You are extracting sports achievement information from a certificate or trophy photo.
+  const { jsonrepair } = await import("jsonrepair")
 
-Look at the image carefully and extract the following fields. Return ONLY a JSON object, no markdown, no explanation:
-{
-  "sportName": "name of the sport or event (e.g. Badminton, Football, Swimming)",
-  "achievementType": "one of: TROPHY, CERTIFICATE, MEDAL",
-  "position": "position or placing (e.g. 1st Place, Champion, Runner-up, 3rd Place) — null if not found",
-  "eventName": "full name of the event or competition — null if not found",
-  "date": "date in YYYY-MM-DD format — null if not found",
-  "points": a number between 10 and 100 based on achievement level (1st=100, 2nd=70, 3rd=50, participation=10)
-}
+  const systemPrompt = `You are an AI that reads sports achievement certificates.
+Return ONLY a raw JSON object with these exact keys — no markdown, no backticks, no explanation:
+{"sportName":"...","achievementType":"TROPHY|CERTIFICATE|MEDAL","position":"...or null","eventName":"...or null","date":"YYYY-MM-DD or null"}`
 
-If the image is not a certificate or achievement document, still return the JSON with null values where unknown.`
+  const userPrompt = `Read this certificate image and return the JSON with sportName, achievementType, position, eventName, date.`
 
   let extracted: {
     sportName: string
@@ -73,60 +67,73 @@ If the image is not a certificate or achievement document, still return the JSON
     position: string | null
     eventName: string | null
     date: string | null
-    points: number
   }
 
   try {
-    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization:  `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 512,
+        model:       "meta/llama-3.2-90b-vision-instruct",
         messages: [
+          { role: "system", content: systemPrompt },
           {
             role: "user",
             content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: file.type as "image/jpeg" | "image/png" | "image/webp",
-                  data: base64,
-                },
-              },
-              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: imageUrl } },
+              { type: "text",      text: userPrompt },
             ],
           },
         ],
+        max_tokens:  400,
+        temperature: 0.1,
+        stream:      false,
       }),
     })
 
-    if (!anthropicRes.ok) {
-      const err = await anthropicRes.text()
-      console.error("Anthropic API error:", err)
-      return Response.json({ error: "AI scan failed. Check your API key.", fileUrl }, { status: 502 })
+    const body = await res.text()
+
+    if (!res.ok) {
+      console.error(`NVIDIA API ${res.status}:`, body.slice(0, 500))
+      return Response.json(
+        { error: `AI service error (${res.status}). Please fill in manually.`, fileUrl },
+        { status: 502 },
+      )
     }
 
-    const aiData = await anthropicRes.json()
-    const rawText: string = aiData.choices?.[0]?.message?.content ?? aiData.content?.[0]?.text ?? ""
-    // Strip any markdown code fences if present
-    const jsonText = rawText.replace(/```json\n?|\n?```/g, "").trim()
-    extracted = JSON.parse(jsonText)
+    const aiData = JSON.parse(body) as { choices: { message: { content: string } }[] }
+    const raw    = aiData.choices?.[0]?.message?.content ?? ""
+
+    const start = raw.indexOf("{")
+    const end   = raw.lastIndexOf("}")
+    if (start === -1 || end === -1)
+      throw new Error(`No JSON in response: ${raw.slice(0, 300)}`)
+
+    const repaired = jsonrepair(raw.slice(start, end + 1))
+    extracted = JSON.parse(repaired)
   } catch (err) {
-    console.error("Scan parse error:", err)
-    return Response.json({ error: "Could not parse certificate details.", fileUrl }, { status: 422 })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error("Scan error:", msg)
+    return Response.json(
+      { error: `Scan failed: ${msg.slice(0, 120)}`, fileUrl },
+      { status: 502 },
+    )
   }
 
-  // Normalise achievementType
-  const validTypes = ["TROPHY", "CERTIFICATE", "MEDAL"]
-  if (!validTypes.includes(extracted.achievementType)) {
+  // ── Normalise ─────────────────────────────────────────────────────────────
+  if (!["TROPHY", "CERTIFICATE", "MEDAL"].includes(extracted.achievementType))
     extracted.achievementType = "CERTIFICATE"
-  }
 
-  return Response.json({ ...extracted, fileUrl })
+  return Response.json({
+    sportName:       extracted.sportName       ?? "",
+    achievementType: extracted.achievementType,
+    position:        extracted.position        ?? "",
+    eventName:       extracted.eventName       ?? "",
+    date:            extracted.date            ?? "",
+    points:          positionToMarks(extracted.position),
+    fileUrl,
+  })
 }

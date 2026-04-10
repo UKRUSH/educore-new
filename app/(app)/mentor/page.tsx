@@ -456,6 +456,16 @@ const CSS = `
 /* Skeleton */
 .mp-skel { background: var(--muted); border-radius: .75rem; animation: mpShimmer 1.5s ease-in-out infinite; }
 @keyframes mpShimmer { 0%,100%{opacity:1} 50%{opacity:.45} }
+
+@media (max-width: 640px) {
+  .mp-info-grid { grid-template-columns: 1fr; }
+  .mp-form-row { grid-template-columns: 1fr; }
+  .mp-contact-grid { grid-template-columns: 1fr; }
+  .mp-form-footer { flex-direction: column; }
+  .mp-btn-primary { width: 100%; justify-content: center; }
+  .mp-root { gap: 1rem; }
+  .mp-hero-body { padding: 1.25rem; }
+}
 `
 
 function toInitials(name: string) {

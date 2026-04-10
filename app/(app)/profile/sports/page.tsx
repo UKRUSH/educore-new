@@ -28,7 +28,15 @@ type Achievement = {
   fileAsset?: { fileUrl: string } | null
 }
 
-const EMPTY_FORM = { sportName: "", achievementType: "TROPHY", position: "", date: "", points: "10", eventName: "" }
+const EMPTY_FORM = { sportName: "", achievementType: "TROPHY", position: "", date: "", points: "0.5", eventName: "" }
+
+// Marks scale used for display
+const MARKS_LEGEND = [
+  { label: "1st Place",     marks: 3,   color: "oklch(0.55 0.22 55)",  bg: "oklch(0.97 0.06 55)" },
+  { label: "2nd Place",     marks: 2,   color: "oklch(0.42 0.06 250)", bg: "oklch(0.96 0.02 250)" },
+  { label: "3rd Place",     marks: 1,   color: "oklch(0.45 0.2 25)",   bg: "oklch(0.97 0.04 25)"  },
+  { label: "Participation", marks: 0.5, color: "oklch(0.45 0.18 145)", bg: "oklch(0.95 0.04 145)" },
+]
 
 const CSS = `
 .sp-wrap { max-width: 900px; margin: 0 auto; }
@@ -232,6 +240,33 @@ const CSS = `
 .sp-empty { text-align: center; padding: 4rem 1rem; color: var(--muted-foreground); }
 .sp-empty-icon { font-size: 2.75rem; margin-bottom: .75rem; }
 
+/* Marks legend */
+.sp-marks-legend {
+  display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .65rem;
+}
+.sp-marks-pill {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .28rem .75rem; border-radius: 999px;
+  font-size: .72rem; font-weight: 700; border: 1px solid transparent;
+}
+.sp-marks-val {
+  font-size: .78rem; font-weight: 900;
+}
+
+/* Scan result highlight */
+.sp-scan-result {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .65rem .9rem; border-radius: .7rem;
+  background: oklch(0.93 0.06 145 / .5); border: 1px solid oklch(0.78 0.12 145 / .5);
+  font-size: .78rem; color: oklch(0.38 0.18 145); font-weight: 600;
+}
+.sp-scan-marks-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem; border-radius: 50%; flex-shrink: 0;
+  font-size: .9rem; font-weight: 900; color: #fff;
+  background: linear-gradient(135deg, oklch(0.45 0.2 145), oklch(0.38 0.22 155));
+}
+
 /* Error */
 .sp-err {
   background: oklch(0.97 0.05 25 / 0.5); border: 1px solid oklch(0.85 0.1 25);
@@ -289,6 +324,7 @@ export default function SportsPage() {
   const [certUrl, setCertUrl] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
   const [scanMsg, setScanMsg] = useState("")
+  const [scanMarks, setScanMarks] = useState<number | null>(null)
 
   const [editEntry, setEditEntry] = useState<Achievement | null>(null)
   const [editSaving, setEditSaving] = useState(false)
@@ -307,34 +343,58 @@ export default function SportsPage() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    setCertFile(f); setCertPreview(URL.createObjectURL(f)); setCertUrl(null); setScanMsg("")
+    // Resize client-side to max 800px so base64 stays under NVIDIA's inline limit
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(f)
+    img.onload = () => {
+      const MAX = 800
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX }
+        else { width = Math.round(width * MAX / height); height = MAX }
+      }
+      const canvas = document.createElement("canvas")
+      canvas.width = width; canvas.height = height
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height)
+      canvas.toBlob((blob) => {
+        if (!blob) return
+        const resized = new File([blob], f.name, { type: "image/jpeg" })
+        URL.revokeObjectURL(objectUrl)
+        setCertFile(resized)
+        setCertPreview(URL.createObjectURL(resized))
+        setCertUrl(null); setScanMsg(""); setScanMarks(null)
+      }, "image/jpeg", 0.82)
+    }
+    img.src = objectUrl
   }
 
   function removeCert() {
-    setCertFile(null); setCertPreview(null); setCertUrl(null); setScanMsg("")
+    setCertFile(null); setCertPreview(null); setCertUrl(null); setScanMsg(""); setScanMarks(null)
     if (fileRef.current) fileRef.current.value = ""
   }
 
   async function scanCertificate() {
     if (!certFile) return
-    setScanning(true); setScanMsg(""); setFormError("")
+    setScanning(true); setScanMsg(""); setScanMarks(null); setFormError("")
     const fd = new FormData()
     fd.append("image", certFile)
     try {
       const res = await fetch("/api/profile/sports/scan", { method: "POST", body: fd })
       const data = await res.json()
       if (!res.ok) { setScanMsg(data.error ?? "Scan failed."); if (data.fileUrl) setCertUrl(data.fileUrl); return }
+      const marks = data.points ?? 0.5
       setForm((prev) => ({
         ...prev,
-        sportName: data.sportName ?? prev.sportName,
-        achievementType: data.achievementType ?? prev.achievementType,
-        position: data.position ?? prev.position,
-        date: data.date ?? prev.date,
-        points: String(data.points ?? prev.points),
-        eventName: data.eventName ?? prev.eventName,
+        sportName:       data.sportName       ?? prev.sportName,
+        achievementType: data.achievementType  ?? prev.achievementType,
+        position:        data.position        ?? prev.position,
+        date:            data.date            ?? prev.date,
+        points:          String(marks),
+        eventName:       data.eventName       ?? prev.eventName,
       }))
       setCertUrl(data.fileUrl)
-      setScanMsg("Certificate scanned — fields auto-filled. Review and adjust if needed.")
+      setScanMarks(marks)
+      setScanMsg("Certificate scanned — fields auto-filled. Review before saving.")
     } catch { setScanMsg("Scan error. Please fill in details manually.") }
     finally { setScanning(false) }
   }
@@ -409,7 +469,7 @@ export default function SportsPage() {
         <div>
           <p className="sp-score-label">Sports Score</p>
           <p className="sp-score-val">{sportsScore}<span className="sp-score-unit"> / 100</span></p>
-          <p className="sp-score-meta">{achievements.length} achievement{achievements.length !== 1 ? "s" : ""} · {totalPoints} total pts</p>
+          <p className="sp-score-meta">{achievements.length} achievement{achievements.length !== 1 ? "s" : ""} · {totalPoints} total marks</p>
         </div>
         <div className="sp-score-bar-wrap">
           <div className="sp-score-track">
@@ -430,7 +490,14 @@ export default function SportsPage() {
               <span className="sp-step">1</span>
               <h3 className="sp-section-title">Upload Certificate (optional)</h3>
             </div>
-            <p className="sp-section-desc">Upload a photo of your certificate or trophy, then click <strong>Scan Certificate</strong> to auto-fill details with AI.</p>
+            <p className="sp-section-desc">Upload a photo of your certificate. AI will scan it and auto-assign marks based on your placement.</p>
+            <div className="sp-marks-legend">
+              {MARKS_LEGEND.map((m) => (
+                <span key={m.label} className="sp-marks-pill" style={{ background: m.bg, color: m.color, borderColor: m.color + "44" }}>
+                  <span className="sp-marks-val">{m.marks}</span> {m.label}
+                </span>
+              ))}
+            </div>
             {!certPreview ? (
               <label className="sp-dropzone">
                 <svg className="sp-dropzone-icon" width="40" height="40" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -471,7 +538,16 @@ export default function SportsPage() {
                       </>
                     )}
                   </button>
-                  {scanMsg && (
+                  {scanMarks !== null && (
+                    <div className="sp-scan-result">
+                      <span className="sp-scan-marks-badge">{scanMarks}</span>
+                      <span>
+                        <strong>{scanMarks === 3 ? "1st Place" : scanMarks === 2 ? "2nd Place" : scanMarks === 1 ? "3rd Place" : "Participation"}</strong>
+                        {" "}detected — <strong>{scanMarks} mark{scanMarks !== 1 ? "s" : ""}</strong> awarded
+                      </span>
+                    </div>
+                  )}
+                  {scanMsg && !scanMarks && (
                     <p className={`sp-scan-msg ${scanMsg.includes("auto-filled") ? "sp-scan-ok" : "sp-scan-err"}`}>{scanMsg}</p>
                   )}
                 </div>
@@ -511,9 +587,14 @@ export default function SportsPage() {
                   onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
               </div>
               <div>
-                <label className="sp-field-label">Points Awarded</label>
-                <input className="sp-input" type="number" min={0} value={form.points}
-                  onChange={(e) => setForm((p) => ({ ...p, points: e.target.value }))} />
+                <label className="sp-field-label">Marks Awarded</label>
+                <select className="sp-input sp-select" value={form.points}
+                  onChange={(e) => setForm((p) => ({ ...p, points: e.target.value }))}>
+                  <option value="3">3 — 1st Place / Champion</option>
+                  <option value="2">2 — 2nd Place / Runner-up</option>
+                  <option value="1">1 — 3rd Place</option>
+                  <option value="0.5">0.5 — Participation</option>
+                </select>
               </div>
               <div>
                 <label className="sp-field-label">Competition / Event Name</label>
@@ -584,7 +665,7 @@ export default function SportsPage() {
                     )}
                     <div>
                       <p className="sp-stat-label">Points</p>
-                      <p className="sp-stat-val sp-stat-pts">+{ach.points} pts</p>
+                      <p className="sp-stat-val sp-stat-pts">+{ach.points} marks</p>
                     </div>
                     <div className={ach.position ? "" : "col-span-2"}>
                       <p className="sp-stat-label">Date</p>
@@ -630,9 +711,14 @@ export default function SportsPage() {
                     onChange={(e) => setEditEntry((p) => p ? { ...p, position: e.target.value || null } : null)} />
                 </div>
                 <div>
-                  <label className="sp-field-label">Points</label>
-                  <input className="sp-input" type="number" min={0} value={editEntry.points}
-                    onChange={(e) => setEditEntry((p) => p ? { ...p, points: Number(e.target.value) } : null)} />
+                  <label className="sp-field-label">Marks</label>
+                  <select className="sp-input sp-select" value={editEntry.points}
+                    onChange={(e) => setEditEntry((p) => p ? { ...p, points: Number(e.target.value) } : null)}>
+                    <option value={3}>3 — 1st Place</option>
+                    <option value={2}>2 — 2nd Place</option>
+                    <option value={1}>1 — 3rd Place</option>
+                    <option value={0.5}>0.5 — Participation</option>
+                  </select>
                 </div>
               </div>
               <div>

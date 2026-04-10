@@ -167,12 +167,14 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string; bord
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function Sidebar({
-  role, name, photoUrl, isDeanList = false,
+  role, name, photoUrl, isDeanList = false, mobileOpen = false, onMobileClose,
 }: {
   role: string
   name: string
   photoUrl: string | null
   isDeanList?: boolean
+  mobileOpen?: boolean
+  onMobileClose?: () => void
 }) {
   const pathname = usePathname()
   const baseSections = NAV[role] ?? NAV.STUDENT
@@ -379,9 +381,43 @@ export default function Sidebar({
           border-color:rgba(239,68,68,.18); transform:translateX(2px);
         }
         .sb-logout:hover .sb-icon { background:rgba(239,68,68,.1); color:#ef4444; }
+
+        /* ═══════ MOBILE CLOSE BTN ═══════ */
+        .sb-mobile-close {
+          display:none; position:absolute; top:.75rem; right:.75rem;
+          width:32px; height:32px; border-radius:.5rem;
+          background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.25);
+          color:#fff; cursor:pointer; align-items:center; justify-content:center;
+          z-index:3;
+        }
+        .sb-mobile-close svg { width:16px; height:16px; }
+
+        /* ═══════ MOBILE RESPONSIVE ═══════ */
+        @media (max-width: 768px) {
+          .sb-root {
+            position: fixed;
+            left: 0; top: 0; bottom: 0;
+            z-index: 50;
+            transform: translateX(-100%);
+            transition: transform .25s cubic-bezier(.4,0,.2,1);
+            box-shadow: none;
+          }
+          .sb-root.mobile-open {
+            transform: translateX(0);
+            box-shadow: 4px 0 40px rgba(0,0,0,.2);
+          }
+          .sb-mobile-close { display:flex; }
+        }
       `}</style>
 
-      <aside className="sb-root">
+      <aside className={`sb-root${mobileOpen ? " mobile-open" : ""}`}>
+
+        {/* ── Mobile close button ── */}
+        <button className="sb-mobile-close" onClick={onMobileClose} aria-label="Close menu">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
 
         {/* ── Banner ── */}
         <div className="sb-banner">

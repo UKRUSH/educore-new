@@ -339,6 +339,11 @@ const CSS = `
 }
 .mt-action-btn.summarize:hover { background: oklch(0.88 0.07 290 / 0.7); }
 .mt-action-btn.summarize:disabled { opacity: .5; cursor: not-allowed; }
+.mt-action-btn.download-summary {
+  background: oklch(0.93 0.05 145 / 0.5); color: oklch(0.38 0.18 145);
+  border-color: oklch(0.82 0.08 145 / 0.4);
+}
+.mt-action-btn.download-summary:hover { background: oklch(0.88 0.07 145 / 0.7); }
 .mt-action-btn svg { width: 13px; height: 13px; }
 
 .mt-icon-btn {
@@ -545,6 +550,180 @@ export default function MaterialsPage() {
     const res = await fetch(`/api/materials/${id}`, { method: "DELETE" })
     if (res.ok) setMaterials((prev) => prev.filter((m) => m.id !== id))
     else setError("Failed to delete material.")
+  }
+
+  // ── Download Summary as PDF ───────────────────────────────────────────────
+  function downloadSummary(mat: Material) {
+    if (!mat.summary) return
+    const terms = mat.summary.keyTerms
+      ? mat.summary.keyTerms.split(",").map((t) => `<span class="term">${t.trim()}</span>`).join("")
+      : ""
+    const resources = mat.suggestedResources.length > 0
+      ? mat.suggestedResources.map((r) => `<a href="${r.url}" class="resource" target="_blank">
+          <span class="res-badge ${r.type.toLowerCase()}">${r.type}</span>
+          <span class="res-title">${r.title}</span>
+          <span class="res-source">${r.sourceName}</span>
+        </a>`).join("")
+      : ""
+
+    const dateStr = new Date().toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" })
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Summary – ${mat.title}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#fff;color:#111827;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+  /* ── Screen wrapper ── */
+  @media screen{
+    body{background:#e5e7eb;padding:2rem}
+    .page{max-width:800px;margin:0 auto;background:#fff;border-radius:1.25rem;box-shadow:0 8px 48px rgba(0,0,0,.14);overflow:hidden}
+    .print-hint{text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6b7280;font-family:inherit}
+    .print-hint kbd{background:#fff;border:1px solid #d1d5db;border-radius:.35rem;padding:.15rem .45rem;font-size:.78rem;color:#374151}
+  }
+  @media print{
+    body{background:#fff;padding:0}
+    .page{box-shadow:none;border-radius:0}
+    .print-hint{display:none}
+    .header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+
+  /* ── Header ── */
+  .header{
+    background:linear-gradient(135deg,#1e1b4b 0%,#3730a3 55%,#4f46e5 100%);
+    padding:2.25rem 2.5rem 2rem;color:#fff;position:relative;overflow:hidden
+  }
+  .header::after{
+    content:'';position:absolute;top:-80px;right:-80px;
+    width:300px;height:300px;border-radius:50%;
+    background:radial-gradient(circle,rgba(99,102,241,.35) 0%,transparent 70%);
+    pointer-events:none
+  }
+  .header-inner{position:relative;z-index:1}
+  .edu-badge{
+    display:inline-flex;align-items:center;gap:.4rem;
+    background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
+    border-radius:999px;padding:.22rem .8rem;font-size:.68rem;font-weight:800;
+    letter-spacing:.08em;text-transform:uppercase;margin-bottom:.9rem;color:rgba(255,255,255,.9)
+  }
+  .edu-dot{width:6px;height:6px;border-radius:50%;background:#a5f3fc;box-shadow:0 0 6px #a5f3fc}
+  .header h1{font-size:1.6rem;font-weight:900;letter-spacing:-.03em;margin-bottom:.35rem;line-height:1.2}
+  .header-meta{font-size:.8rem;opacity:.65;display:flex;gap:1rem;flex-wrap:wrap}
+  .header-meta span{display:flex;align-items:center;gap:.3rem}
+
+  /* ── Body ── */
+  .body{padding:2rem 2.5rem;display:flex;flex-direction:column;gap:1.75rem}
+
+  /* section label */
+  .sec-label{
+    display:inline-flex;align-items:center;gap:.4rem;
+    font-size:.68rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    color:#6366f1;margin-bottom:.65rem
+  }
+
+  /* Quick Summary */
+  .summary-box{
+    background:linear-gradient(135deg,#eef2ff 0%,#e0e7ff 100%);
+    border:1px solid #c7d2fe;border-radius:1rem;padding:1.4rem 1.6rem
+  }
+  .summary-box .sec-label{color:#4338ca}
+  .summary-box p{font-size:.925rem;line-height:1.8;color:#3730a3;font-weight:500}
+
+  /* Detailed Notes */
+  .notes-box{
+    background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:1rem;
+    padding:1.4rem 1.6rem;font-size:.875rem;line-height:1.85;
+    white-space:pre-wrap;color:#374151
+  }
+
+  /* Key Terms */
+  .terms{display:flex;flex-wrap:wrap;gap:.45rem}
+  .term{
+    background:#f0f9ff;border:1px solid #bae6fd;border-radius:.55rem;
+    padding:.3rem .75rem;font-size:.775rem;font-weight:600;color:#0369a1
+  }
+
+  /* Resources */
+  .resources{display:flex;flex-direction:column;gap:.55rem}
+  .resource{
+    display:flex;align-items:center;gap:.8rem;padding:.8rem 1.1rem;
+    background:#f9fafb;border:1px solid #e5e7eb;border-radius:.75rem;
+    text-decoration:none;color:inherit
+  }
+  .res-badge{font-size:.63rem;font-weight:800;letter-spacing:.05em;padding:.22rem .6rem;border-radius:.4rem;flex-shrink:0;text-transform:uppercase}
+  .res-badge.article{background:#dbeafe;color:#1d4ed8}
+  .res-badge.youtube{background:#fee2e2;color:#dc2626}
+  .res-badge.link{background:#dcfce7;color:#16a34a}
+  .res-title{font-size:.85rem;font-weight:600;flex:1;color:#111827}
+  .res-source{font-size:.75rem;color:#9ca3af}
+
+  /* Footer */
+  .footer{
+    border-top:1px solid #f3f4f6;padding:1rem 2.5rem;
+    font-size:.72rem;color:#9ca3af;display:flex;justify-content:space-between;align-items:center
+  }
+  .footer-brand{font-weight:700;color:#6366f1}
+  .divider{width:1px;height:100%;background:#e5e7eb}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-inner">
+      <div class="edu-badge"><span class="edu-dot"></span>AI Summary · EduCore</div>
+      <h1>${mat.title}</h1>
+      <div class="header-meta">
+        <span>📚 ${mat.courseCode}</span>
+        <span>📅 ${dateStr}</span>
+        <span>✨ AI Generated</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div>
+      <div class="summary-box">
+        <div class="sec-label">✨ Quick Summary</div>
+        <p>${mat.summary.quickSummary}</p>
+      </div>
+    </div>
+
+    ${mat.summary.detailedNotes ? `<div>
+      <div class="sec-label">📖 Detailed Notes</div>
+      <div class="notes-box">${mat.summary.detailedNotes}</div>
+    </div>` : ""}
+
+    ${terms ? `<div>
+      <div class="sec-label">🔑 Key Terms</div>
+      <div class="terms">${terms}</div>
+    </div>` : ""}
+
+    ${resources ? `<div>
+      <div class="sec-label">🔗 Suggested Resources</div>
+      <div class="resources">${resources}</div>
+    </div>` : ""}
+  </div>
+
+  <div class="footer">
+    <span class="footer-brand">EduCore</span>
+    <span>${mat.courseCode} · ${mat.title}</span>
+    <span>${dateStr}</span>
+  </div>
+</div>
+<p class="print-hint">Press <kbd>Ctrl+P</kbd> (or <kbd>⌘P</kbd> on Mac) → <strong>Save as PDF</strong></p>
+<script>window.onload=function(){window.print()}</script>
+</body>
+</html>`
+
+    const win = window.open("", "_blank")
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+    }
   }
 
   const pendingCount   = fileEntries.filter((e) => e.status === "pending").length
@@ -918,7 +1097,15 @@ export default function MaterialsPage() {
                       {mat.summary && (
                         <>
                           <div className="mt-ai-box">
-                            <div className="mt-ai-box-title">✨ AI Quick Summary</div>
+                            <div className="mt-ai-box-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: ".5rem" }}>
+                              <span>✨ AI Quick Summary</span>
+                              <button className="mt-action-btn download-summary" onClick={() => downloadSummary(mat)} title="Download summary as PDF">
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13 }}>
+                                  <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+                                </svg>
+                                Download Summary
+                              </button>
+                            </div>
                             <p className="mt-body-text">{mat.summary.quickSummary}</p>
                           </div>
 

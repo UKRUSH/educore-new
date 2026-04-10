@@ -277,6 +277,13 @@ const CSS = `
 /* ── Skeleton ── */
 .su-skel { background: var(--muted); border-radius: .75rem; animation: suSkel 1.4s ease-in-out infinite; }
 @keyframes suSkel { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+@media (max-width: 580px) {
+  .su-row { grid-template-columns: 1fr; }
+  .su-locked-grid { grid-template-columns: 1fr; }
+  .su-next-grid { grid-template-columns: 1fr; }
+  .su-btn-row { flex-direction: column; }
+}
 `
 
 export default function ProfileSetupPage() {

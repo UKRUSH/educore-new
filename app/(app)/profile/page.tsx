@@ -334,6 +334,20 @@ export default async function ProfilePage() {
           background: oklch(0.4882 0.2172 264.3763 / .08);
           display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
         }
+
+        /* ── Responsive grids ── */
+        .pf-content-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
+        .pf-content-span2 { grid-column: span 2; }
+        .pf-sugg-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: .875rem; }
+
+        @media (max-width: 900px) {
+          .pf-content-grid { grid-template-columns: 1fr; }
+          .pf-content-span2 { grid-column: span 1; }
+          .pf-sugg-grid { grid-template-columns: repeat(2,1fr); }
+        }
+        @media (max-width: 540px) {
+          .pf-sugg-grid { grid-template-columns: 1fr; }
+        }
       `}</style>
 
       <div className="pf-page">
@@ -409,10 +423,10 @@ export default async function ProfilePage() {
         </div>
 
         {/* ════════════════ CONTENT GRID ════════════════ */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1.25rem" }}>
+        <div className="pf-content-grid">
 
           {/* ── Current Semester (span 2) ── */}
-          <div className="pf-card" style={{ gridColumn: "span 2" }}>
+          <div className="pf-card pf-content-span2">
             <div className="pf-card-head">
               <div className="pf-card-head-left">
                 <div className="pf-card-icon" style={{ background: "oklch(0.4882 0.2172 264.3763 / .1)" }}>📖</div>
@@ -604,7 +618,7 @@ export default async function ProfilePage() {
               </div>
             </div>
           </div>
-          <div className="pf-card-body" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: ".875rem" }}>
+          <div className="pf-card-body pf-sugg-grid">
             {topSuggestions.map((s, i) => (
               <div key={i} className="pf-sugg">
                 <div style={{ display: "flex", alignItems: "flex-start", gap: ".65rem" }}>
