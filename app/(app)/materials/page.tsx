@@ -406,6 +406,105 @@ const CSS = `
 .mt-resource-arrow { margin-left: auto; flex-shrink: 0; color: var(--muted-foreground); padding-top: .2rem; }
 .mt-resource-arrow svg { width: 12px; height: 12px; }
 
+/* ── Handwriting panel ── */
+.mt-hw-panel {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 1.25rem; overflow: hidden; margin-bottom: 1.5rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,.06);
+  animation: mtSlideDown .25s cubic-bezier(.22,1,.36,1);
+}
+.mt-hw-header {
+  padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(90deg, oklch(0.96 0.025 310), var(--card));
+}
+.mt-hw-title { font-size: 1rem; font-weight: 800; color: var(--foreground); display: flex; align-items: center; gap: .5rem; }
+.mt-hw-hint { font-size: .75rem; color: var(--muted-foreground); }
+.mt-hw-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.1rem; }
+
+.mt-hw-dropzone {
+  border: 2px dashed var(--border); border-radius: 1rem;
+  padding: 2.25rem 1.5rem; text-align: center; cursor: pointer;
+  transition: border-color .2s, background .2s; position: relative;
+}
+.mt-hw-dropzone:hover, .mt-hw-dropzone.over {
+  border-color: oklch(0.65 0.22 310);
+  background: oklch(0.65 0.22 310 / 0.04);
+}
+.mt-hw-dropzone.disabled { pointer-events: none; opacity: .55; }
+.mt-hw-drop-icon {
+  width: 3.5rem; height: 3.5rem; border-radius: 1rem; margin: 0 auto .85rem;
+  background: oklch(0.94 0.04 310 / 0.6);
+  display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+}
+.mt-hw-drop-title { font-size: .9rem; font-weight: 700; color: var(--foreground); margin-bottom: .3rem; }
+.mt-hw-drop-sub { font-size: .78rem; color: var(--muted-foreground); }
+
+.mt-hw-preview-wrap {
+  position: relative; border-radius: .9rem; overflow: hidden;
+  border: 1.5px solid var(--border); background: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  min-height: 180px; max-height: 320px;
+}
+.mt-hw-preview-img { width: 100%; max-height: 320px; object-fit: contain; display: block; }
+.mt-hw-remove-img {
+  position: absolute; top: .6rem; right: .6rem;
+  width: 2rem; height: 2rem; border-radius: .5rem;
+  background: oklch(0.97 0.05 25 / 0.85); border: 1px solid oklch(0.88 0.1 25 / 0.5);
+  color: oklch(0.5 0.22 25); font-size: .9rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.mt-hw-remove-img:hover { background: oklch(0.93 0.07 25 / 0.95); }
+
+.mt-hw-result {
+  background: oklch(0.96 0.025 310 / 0.5); border: 1px solid oklch(0.85 0.06 310 / 0.5);
+  border-radius: 1rem; padding: 1.25rem 1.4rem;
+  display: flex; flex-direction: column; gap: 1rem;
+  animation: mtSlideDown .2s ease;
+}
+.mt-hw-section-label {
+  font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+  color: oklch(0.45 0.2 310); margin-bottom: .45rem; display: flex; align-items: center; gap: .35rem;
+}
+.mt-hw-extracted {
+  background: var(--background); border: 1px solid var(--border);
+  border-radius: .75rem; padding: .9rem 1rem;
+  font-size: .84rem; color: var(--foreground); line-height: 1.8;
+  white-space: pre-wrap; max-height: 180px; overflow-y: auto;
+  font-family: inherit;
+}
+.mt-hw-extracted::-webkit-scrollbar { width: 4px; }
+.mt-hw-extracted::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.mt-hw-summary-text { font-size: .875rem; color: var(--foreground); line-height: 1.75; }
+.mt-hw-terms { display: flex; flex-wrap: wrap; gap: .45rem; }
+.mt-hw-term {
+  font-size: .74rem; font-weight: 700; padding: .28rem .72rem; border-radius: 999px;
+  background: oklch(0.93 0.05 310 / 0.6); color: oklch(0.4 0.2 310);
+  border: 1px solid oklch(0.82 0.08 310 / 0.5);
+}
+.mt-hw-actions { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; }
+.mt-hw-analyze-btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .75rem 1.5rem; border-radius: .75rem;
+  background: linear-gradient(135deg, oklch(0.55 0.22 310), oklch(0.45 0.2 300));
+  color: #fff; font-size: .875rem; font-weight: 800; border: none; cursor: pointer;
+  box-shadow: 0 3px 14px oklch(0.55 0.22 310 / 0.38);
+  transition: opacity .2s, transform .15s;
+}
+.mt-hw-analyze-btn:hover { opacity: .9; transform: translateY(-1px); }
+.mt-hw-analyze-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.mt-hw-save-btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .75rem 1.25rem; border-radius: .75rem;
+  background: linear-gradient(135deg, oklch(0.55 0.18 145), oklch(0.45 0.16 150));
+  color: #fff; font-size: .875rem; font-weight: 700; border: none; cursor: pointer;
+  box-shadow: 0 3px 14px oklch(0.55 0.18 145 / 0.35);
+  transition: opacity .2s, transform .15s;
+}
+.mt-hw-save-btn:hover { opacity: .9; transform: translateY(-1px); }
+.mt-hw-save-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
 /* Spin */
 @keyframes spin { to { transform: rotate(360deg); } }
 .mt-spin { animation: spin .8s linear infinite; }
@@ -435,6 +534,20 @@ export default function MaterialsPage() {
   const [dragOver, setDragOver]               = useState(false)
   const [courseCodeTouched, setCourseCodeTouched] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Handwriting state ─────────────────────────────────────────────────────
+  const [showHandwriting, setShowHandwriting]       = useState(false)
+  const [hwImage, setHwImage]                       = useState<File | null>(null)
+  const [hwPreview, setHwPreview]                   = useState<string | null>(null)
+  const [hwDragOver, setHwDragOver]                 = useState(false)
+  const [hwLoading, setHwLoading]                   = useState(false)
+  const [hwError, setHwError]                       = useState("")
+  const [hwSaving, setHwSaving]                     = useState(false)
+  const [hwResult, setHwResult]                     = useState<{
+    detectedLanguage: string; extractedText: string; englishTranslation: string
+    quickSummary: string; detailedNotes: string; keyTerms: string
+  } | null>(null)
+  const hwInputRef = useRef<HTMLInputElement>(null)
 
   const [expanded, setExpanded]                 = useState<number | null>(null)
   const [summarizing, setSummarizing]           = useState<number | null>(null)
@@ -519,6 +632,208 @@ export default function MaterialsPage() {
   function closeUpload() {
     setShowUpload(false); setCourseCode(""); setMatType("NOTES")
     setDescription(""); setFileEntries([]); setUploadError(""); setCourseCodeTouched(false)
+  }
+
+  // ── Handwriting handlers ───────────────────────────────────────────────────
+  function pickHwImage(file: File) {
+    if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
+      setHwError("Only JPG, PNG, or WEBP images are supported."); return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setHwError("Image too large. Max 10 MB."); return
+    }
+    setHwImage(file)
+    setHwPreview(URL.createObjectURL(file))
+    setHwResult(null)
+    setHwError("")
+  }
+  function handleHwDrop(ev: React.DragEvent) {
+    ev.preventDefault(); setHwDragOver(false)
+    const f = ev.dataTransfer.files[0]; if (f) pickHwImage(f)
+  }
+  function closeHandwriting() {
+    setShowHandwriting(false); setHwImage(null)
+    if (hwPreview) URL.revokeObjectURL(hwPreview)
+    setHwPreview(null); setHwResult(null); setHwError("")
+  }
+  // Always re-encode to JPEG ≤640px at 55% quality before sending.
+  // This caps the base64 payload at ~25-45 KB, which the vision model processes fastest.
+  async function compressForUpload(file: File): Promise<File> {
+    const MAX_PX  = 640
+    const QUALITY = 0.55
+    return new Promise((resolve) => {
+      const img    = new Image()
+      const objUrl = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(objUrl)
+        let { width, height } = img
+        if (width > height) { height = Math.round(height * MAX_PX / width); width  = MAX_PX }
+        else                { width  = Math.round(width  * MAX_PX / height); height = MAX_PX }
+        const canvas = document.createElement("canvas")
+        canvas.width = width; canvas.height = height
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height)
+        canvas.toBlob(
+          (blob) => resolve(blob ? new File([blob], "hw.jpg", { type: "image/jpeg" }) : file),
+          "image/jpeg", QUALITY,
+        )
+      }
+      img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(file) }
+      img.src = objUrl
+    })
+  }
+
+  async function analyzeHandwriting() {
+    if (!hwImage || hwLoading) return
+    setHwLoading(true); setHwError("")
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 58000) // 58-second client timeout
+    try {
+      const compressed = await compressForUpload(hwImage)
+      const fd = new FormData()
+      fd.append("image", compressed)
+      const res  = await fetch("/api/materials/handwriting", { method: "POST", body: fd, signal: controller.signal })
+      const text = await res.text()
+      let data: Record<string, unknown>
+      try { data = JSON.parse(text) }
+      catch { setHwError("Server returned an unexpected response. Please try again."); return }
+      if (!res.ok) { setHwError((data.error as string) ?? `Server error (${res.status}). Please try again.`); return }
+      setHwResult(data as Parameters<typeof setHwResult>[0])
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setHwError("Analysis timed out. The AI service is busy — please try again in a moment.")
+      } else {
+        setHwError("Network error. Please check your connection and try again.")
+      }
+    } finally {
+      clearTimeout(timer)
+      setHwLoading(false)
+    }
+  }
+  async function saveHandwritingAsMaterial() {
+    if (!hwResult || !hwImage || hwSaving) return
+    setHwSaving(true); setHwError("")
+    try {
+      // Step 1: upload the image file
+      const fd = new FormData()
+      fd.append("file",        hwImage)
+      fd.append("title",       hwImage.name.replace(/\.[^.]+$/, "") || "Handwritten Notes")
+      fd.append("courseCode",  "HW0001")
+      fd.append("type",        "NOTES")
+      fd.append("description", hwResult.quickSummary.slice(0, 255))
+      const uploadRes = await fetch("/api/materials/upload", { method: "POST", body: fd })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok) { setHwError(uploadData.error ?? "Save failed."); return }
+
+      // Step 2: persist the AI summary to the database
+      const summaryRes = await fetch(`/api/materials/${uploadData.id}/save-summary`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          extractedText: `[${hwResult.detectedLanguage}]\n${hwResult.extractedText}${hwResult.englishTranslation !== hwResult.extractedText ? `\n\n[English Translation]\n${hwResult.englishTranslation}` : ""}`,
+          quickSummary:  hwResult.quickSummary,
+          detailedNotes: hwResult.detailedNotes,
+          keyTerms:      hwResult.keyTerms,
+        }),
+      })
+      const savedMat = await summaryRes.json()
+
+      // Use the fully updated material (with summary) if save-summary succeeded
+      if (!summaryRes.ok) {
+        console.error("save-summary failed:", savedMat)
+        // Still add the material, but warn the user
+        setMaterials((prev) => [{ ...uploadData, suggestedResources: [] }, ...prev])
+        setHwError("Saved image but could not store AI summary — click ✨ Summarise on the card to retry.")
+        return
+      }
+      const finalMat = { ...savedMat, suggestedResources: savedMat.suggestedResources ?? [] }
+      setMaterials((prev) => [finalMat, ...prev])
+      setExpanded(finalMat.id) // auto-expand so the summary is immediately visible
+      closeHandwriting()
+    } catch { setHwError("Network error. Please try again.") }
+    finally { setHwSaving(false) }
+  }
+
+  // ── Download handwriting summary as PDF (from live hwResult, before/after saving) ──
+  function downloadHwSummary() {
+    if (!hwResult || !hwImage) return
+    const title    = hwImage.name.replace(/\.[^.]+$/, "") || "Handwritten Notes"
+    const dateStr  = new Date().toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" })
+    const terms    = hwResult.keyTerms
+      ? hwResult.keyTerms.split(",").map((t) => `<span class="term">${t.trim()}</span>`).join("")
+      : ""
+
+    const lang     = hwResult.detectedLanguage ?? "Unknown"
+    const hasTranslation = hwResult.englishTranslation && hwResult.englishTranslation !== hwResult.extractedText
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Handwriting Summary – ${title}</title>
+<style>
+  /* Load Noto Sans Sinhala for proper Sinhala Unicode rendering + Inter for UI */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@400;700&family=Noto+Sans+Tamil:wght@400;700&family=Noto+Sans:wght@400;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#fff;color:#111827;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* Sinhala/Tamil/non-Latin text uses Noto Sans for correct glyph rendering */
+  .native-text{font-family:'Noto Sans Sinhala','Noto Sans Tamil','Noto Sans',system-ui,sans-serif;line-height:2.1;font-size:.9rem}
+  @media screen{body{background:#e5e7eb;padding:2rem}.page{max-width:800px;margin:0 auto;background:#fff;border-radius:1.25rem;box-shadow:0 8px 48px rgba(0,0,0,.14);overflow:hidden}.print-hint{text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6b7280;font-family:inherit}.print-hint kbd{background:#fff;border:1px solid #d1d5db;border-radius:.35rem;padding:.15rem .45rem;font-size:.78rem;color:#374151}}
+  @media print{body{background:#fff;padding:0}.page{box-shadow:none;border-radius:0}.print-hint{display:none}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  .header{background:linear-gradient(135deg,#4a1d96 0%,#7c3aed 55%,#a855f7 100%);padding:2.25rem 2.5rem 2rem;color:#fff;position:relative;overflow:hidden}
+  .header::after{content:'';position:absolute;top:-80px;right:-80px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,.35) 0%,transparent 70%);pointer-events:none}
+  .header-inner{position:relative;z-index:1}
+  .edu-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:.22rem .8rem;font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.9rem;color:rgba(255,255,255,.9)}
+  .lang-badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:.22rem .8rem;font-size:.68rem;font-weight:700;color:rgba(255,255,255,.95);margin-left:.5rem}
+  .edu-dot{width:6px;height:6px;border-radius:50%;background:#e9d5ff;box-shadow:0 0 6px #e9d5ff}
+  .header h1{font-size:1.6rem;font-weight:900;letter-spacing:-.03em;margin-bottom:.35rem;line-height:1.2}
+  .header-meta{font-size:.8rem;opacity:.65;display:flex;gap:1rem;flex-wrap:wrap}
+  .body{padding:2rem 2.5rem;display:flex;flex-direction:column;gap:1.75rem}
+  .sec-label{display:inline-flex;align-items:center;gap:.4rem;font-size:.68rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#7c3aed;margin-bottom:.65rem}
+  .extracted-box{background:#faf5ff;border:1px solid #e9d5ff;border-radius:1rem;padding:1.4rem 1.6rem;white-space:pre-wrap;color:#4c1d95}
+  .translation-box{background:#f0f9ff;border:1px solid #bae6fd;border-radius:1rem;padding:1.4rem 1.6rem;font-size:.875rem;line-height:1.85;white-space:pre-wrap;color:#0c4a6e}
+  .summary-box{background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%);border:1px solid #ddd6fe;border-radius:1rem;padding:1.4rem 1.6rem}
+  .summary-box p{font-size:.925rem;line-height:1.8;color:#5b21b6;font-weight:500}
+  .notes-box{background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:1rem;padding:1.4rem 1.6rem;font-size:.875rem;line-height:1.85;white-space:pre-wrap;color:#374151}
+  .terms{display:flex;flex-wrap:wrap;gap:.45rem}
+  .term{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:.55rem;padding:.3rem .75rem;font-size:.775rem;font-weight:600;color:#6d28d9}
+  .footer{border-top:1px solid #f3f4f6;padding:1rem 2.5rem;font-size:.72rem;color:#9ca3af;display:flex;justify-content:space-between;align-items:center}
+  .footer-brand{font-weight:700;color:#7c3aed}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <div class="edu-badge"><span class="edu-dot"></span>✍️ Handwriting Summary · EduCore</div>
+        <span class="lang-badge">🌐 ${lang}</span>
+      </div>
+      <h1>${title}</h1>
+      <div class="header-meta"><span>📅 ${dateStr}</span><span>✨ AI Extracted &amp; Translated</span></div>
+    </div>
+  </div>
+  <div class="body">
+    ${hwResult.extractedText ? `<div>
+      <div class="sec-label">✍️ Extracted Text (${lang})</div>
+      <div class="extracted-box native-text">${hwResult.extractedText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+    </div>` : ""}
+    ${hasTranslation ? `<div>
+      <div class="sec-label">🇬🇧 English Translation</div>
+      <div class="translation-box">${hwResult.englishTranslation.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+    </div>` : ""}
+    <div><div class="summary-box"><div class="sec-label">✨ Quick Summary</div><p>${hwResult.quickSummary}</p></div></div>
+    ${hwResult.detailedNotes ? `<div><div class="sec-label">📖 Detailed Notes</div><div class="notes-box">${hwResult.detailedNotes.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div></div>` : ""}
+    ${terms ? `<div><div class="sec-label">🔑 Key Terms</div><div class="terms">${terms}</div></div>` : ""}
+  </div>
+  <div class="footer"><span class="footer-brand">EduCore</span><span>✍️ ${lang} Handwriting Analysis</span><span>${dateStr}</span></div>
+</div>
+<p class="print-hint">Press <kbd>Ctrl+P</kbd> (or <kbd>⌘P</kbd> on Mac) → <strong>Save as PDF</strong></p>
+<script>window.onload=function(){window.print()}</script>
+</body>
+</html>`
+
+    const win = window.open("", "_blank")
+    if (win) { win.document.write(html); win.document.close() }
   }
 
   // ── Summarize ─────────────────────────────────────────────────────────────
@@ -768,6 +1083,11 @@ export default function MaterialsPage() {
                   ) : <>✨ Summarise All ({unsummarized})</>}
                 </button>
               )}
+              {!showHandwriting && (
+                <button className="mt-btn-ai" onClick={() => { setShowHandwriting(true); setHwError("") }}>
+                  ✍️ Handwriting
+                </button>
+              )}
               {!showUpload && (
                 <button className="mt-btn-primary" onClick={() => { setShowUpload(true); setUploadError("") }}>
                   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -832,6 +1152,177 @@ export default function MaterialsPage() {
           <div className="mt-error">
             <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             {error}
+          </div>
+        )}
+
+        {/* ── Handwriting panel ── */}
+        {showHandwriting && (
+          <div className="mt-hw-panel">
+            <div className="mt-hw-header">
+              <div className="mt-hw-title">
+                <span>✍️</span> Handwriting Summarise
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
+                <span className="mt-hw-hint">Photo / scan of handwritten notes → AI summary</span>
+                <button className="mt-cancel-btn" style={{ padding: ".35rem .75rem", fontSize: ".78rem" }} onClick={closeHandwriting}>
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-hw-body">
+              {hwError && <div className="mt-upload-err">{hwError}</div>}
+
+              {/* Drop zone — shown when no image picked yet */}
+              {!hwPreview && (
+                <div
+                  className={`mt-hw-dropzone${hwDragOver ? " over" : ""}${hwLoading ? " disabled" : ""}`}
+                  onDragOver={(e) => { e.preventDefault(); setHwDragOver(true) }}
+                  onDragLeave={() => setHwDragOver(false)}
+                  onDrop={handleHwDrop}
+                  onClick={() => hwInputRef.current?.click()}
+                >
+                  <div className="mt-hw-drop-icon">✍️</div>
+                  <div className="mt-hw-drop-title">{hwDragOver ? "Drop image here" : "Click or drag your handwritten photo here"}</div>
+                  <div className="mt-hw-drop-sub">JPG, PNG, WEBP — max 10 MB · A clear photo or scan works best</div>
+                  <input
+                    ref={hwInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: "none" }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) pickHwImage(f) }}
+                  />
+                </div>
+              )}
+
+              {/* Image preview */}
+              {hwPreview && (
+                <div className="mt-hw-preview-wrap">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={hwPreview} alt="Handwriting preview" className="mt-hw-preview-img" />
+                  <button className="mt-hw-remove-img" onClick={() => { setHwImage(null); setHwPreview(null); setHwResult(null); setHwError("") }}>
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {/* AI result */}
+              {hwResult && (
+                <div className="mt-hw-result">
+                  {/* Detected language badge */}
+                  <div style={{ display: "flex", alignItems: "center", gap: ".5rem", flexWrap: "wrap" }}>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: ".35rem",
+                      padding: ".28rem .8rem", borderRadius: "999px", fontSize: ".72rem",
+                      fontWeight: 800, background: "oklch(0.93 0.05 310 / 0.6)",
+                      color: "oklch(0.4 0.2 310)", border: "1px solid oklch(0.82 0.08 310 / 0.5)",
+                    }}>
+                      🌐 Detected: {hwResult.detectedLanguage}
+                    </span>
+                  </div>
+
+                  {/* Original text in its native script */}
+                  <div>
+                    <div className="mt-hw-section-label">✍️ Extracted Text ({hwResult.detectedLanguage})</div>
+                    <div className="mt-hw-extracted" style={{ fontFamily: "'Noto Sans Sinhala', 'Noto Sans Tamil', 'Noto Sans', sans-serif", fontSize: ".9rem", lineHeight: 2 }}>
+                      {hwResult.extractedText}
+                    </div>
+                  </div>
+
+                  {/* English translation — only show if different from extracted */}
+                  {hwResult.englishTranslation && hwResult.englishTranslation !== hwResult.extractedText && (
+                    <div>
+                      <div className="mt-hw-section-label">🇬🇧 English Translation</div>
+                      <div className="mt-hw-extracted" style={{ background: "oklch(0.97 0.02 260 / 0.5)", borderColor: "oklch(0.85 0.06 260 / 0.5)" }}>
+                        {hwResult.englishTranslation}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="mt-hw-section-label">✨ Quick Summary</div>
+                    <div className="mt-hw-summary-text">{hwResult.quickSummary}</div>
+                  </div>
+
+                  {hwResult.detailedNotes && (
+                    <div>
+                      <div className="mt-hw-section-label">📖 Detailed Notes</div>
+                      <div className="mt-notes-box" style={{ maxHeight: 200, overflowY: "auto" }}>{hwResult.detailedNotes}</div>
+                    </div>
+                  )}
+
+                  {hwResult.keyTerms && (
+                    <div>
+                      <div className="mt-hw-section-label">🔑 Key Terms</div>
+                      <div className="mt-hw-terms">
+                        {hwResult.keyTerms.split(",").map((t) => (
+                          <span key={t} className="mt-hw-term">{t.trim()}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="mt-hw-actions">
+                {hwImage && !hwResult && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: ".45rem" }}>
+                    <button className="mt-hw-analyze-btn" onClick={analyzeHandwriting} disabled={hwLoading}>
+                      {hwLoading ? (
+                        <>
+                          <svg className="mt-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                          </svg>
+                          Analysing handwriting…
+                        </>
+                      ) : <>✨ Analyse Handwriting</>}
+                    </button>
+                    {hwLoading && (
+                      <span style={{ fontSize: ".74rem", color: "var(--muted-foreground)", paddingLeft: ".25rem" }}>
+                        ⏳ Analysing notes… usually done in 10–20 seconds.
+                      </span>
+                    )}
+                  </div>
+                )}
+                {hwImage && hwResult && (
+                  <>
+                    <div style={{ display: "flex", flexDirection: "column", gap: ".45rem" }}>
+                      <button className="mt-hw-analyze-btn" onClick={analyzeHandwriting} disabled={hwLoading}>
+                        {hwLoading ? <>
+                          <svg className="mt-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                          </svg>
+                          Re-analysing…
+                        </> : <>🔄 Re-analyse</>}
+                      </button>
+                      {hwLoading && (
+                        <span style={{ fontSize: ".74rem", color: "var(--muted-foreground)", paddingLeft: ".25rem" }}>
+                          ⏳ Re-extracting… usually done in 15–25 seconds.
+                        </span>
+                      )}
+                    </div>
+                    <button className="mt-action-btn download-summary" onClick={downloadHwSummary} title="Download summary as PDF">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13 }}>
+                        <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+                      </svg>
+                      Download Summary
+                    </button>
+                    <button className="mt-hw-save-btn" onClick={saveHandwritingAsMaterial} disabled={hwSaving}>
+                      {hwSaving ? <>
+                        <svg className="mt-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                        </svg>
+                        Saving…
+                      </> : <>💾 Save as Material</>}
+                    </button>
+                  </>
+                )}
+                {!hwImage && (
+                  <button className="mt-cancel-btn" onClick={closeHandwriting}>Cancel</button>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

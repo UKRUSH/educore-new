@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import Sidebar from "./Sidebar"
 import Topbar from "./Topbar"
+import AiBotWidget from "@/components/AiBotWidget"
 
 export default function LayoutShell({
   role, name, photoUrl, isDeanList, children,
@@ -89,6 +90,9 @@ export default function LayoutShell({
           <main className="layout-main">{children}</main>
         </div>
       </div>
+
+      {/* AI Chatbot — floating on all protected pages */}
+      <AiBotWidget />
     </>
   )
 }
