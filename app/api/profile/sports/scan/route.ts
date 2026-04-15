@@ -5,6 +5,7 @@ import { uploadBuffer } from "@/lib/cloudinary"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
 const MAX_SIZE_BYTES = 5 * 1024 * 1024
+const NVIDIA_SCAN_TIMEOUT_MS = 35000
 
 function positionToMarks(position: string | null): number {
   if (!position) return 0.5
@@ -13,6 +14,12 @@ function positionToMarks(position: string | null): number {
   if (/2nd|second|runner.?up|silver/.test(p))   return 2
   if (/3rd|third|bronze/.test(p))               return 1
   return 0.5
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false
+  const maybeName = "name" in error ? String((error as { name?: unknown }).name) : ""
+  return maybeName === "AbortError" || maybeName === "TimeoutError"
 }
 
 export async function POST(request: Request) {
@@ -75,8 +82,10 @@ Return ONLY a raw JSON object with these exact keys — no markdown, no backtick
   }
 
   try {
+    const timeoutSignal = AbortSignal.timeout(NVIDIA_SCAN_TIMEOUT_MS)
     const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
+      signal: timeoutSignal,
       headers: {
         Authorization:  `Bearer ${apiKey}`,
         "Content-Type": "application/json",
@@ -120,6 +129,13 @@ Return ONLY a raw JSON object with these exact keys — no markdown, no backtick
     const repaired = jsonrepair(raw.slice(start, end + 1))
     extracted = JSON.parse(repaired)
   } catch (err) {
+    if (isAbortLikeError(err)) {
+      console.error("Scan timeout: NVIDIA request exceeded limit")
+      return Response.json(
+        { error: "Scanning timed out. Please try again with a clearer image.", fileUrl },
+        { status: 504 },
+      )
+    }
     const msg = err instanceof Error ? err.message : String(err)
     console.error("Scan error:", msg)
     return Response.json(

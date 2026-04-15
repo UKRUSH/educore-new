@@ -28,6 +28,19 @@ type Achievement = {
   fileAsset?: { fileUrl: string } | null
 }
 
+type BatchCert = {
+  id: string
+  file: File
+  preview: string
+  status: "pending" | "scanning" | "saved" | "failed"
+  message: string
+}
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const VALID_ACHIEVEMENT_TYPES = new Set(["TROPHY", "MEDAL", "CERTIFICATE"])
+const CLIENT_SCAN_TIMEOUT_MS = 45000
+
 const EMPTY_FORM = { sportName: "", achievementType: "TROPHY", position: "", date: "", points: "0.5", eventName: "" }
 
 // Marks scale used for display
@@ -167,6 +180,45 @@ const CSS = `
 .sp-scan-msg { font-size: .75rem; }
 .sp-scan-ok { color: oklch(0.45 0.18 145); }
 .sp-scan-err { color: oklch(0.5 0.22 25); }
+
+.sp-bulk-box {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: .8rem;
+  padding: .95rem;
+  background: var(--background);
+}
+.sp-bulk-title { font-size: .8rem; font-weight: 700; color: var(--foreground); margin: 0 0 .25rem; }
+.sp-bulk-sub { font-size: .74rem; color: var(--muted-foreground); margin: 0 0 .8rem; }
+.sp-bulk-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.sp-bulk-pick {
+  display: inline-flex; align-items: center; gap: .45rem;
+  border: 1px solid var(--border); border-radius: .55rem;
+  padding: .45rem .8rem; font-size: .78rem; font-weight: 600;
+  background: var(--card); color: var(--foreground); cursor: pointer;
+}
+.sp-bulk-list { margin-top: .75rem; display: flex; flex-direction: column; gap: .5rem; }
+.sp-bulk-item {
+  display: flex; align-items: center; gap: .65rem;
+  border: 1px solid var(--border); border-radius: .55rem;
+  padding: .45rem .6rem; background: var(--card);
+}
+.sp-bulk-thumb {
+  width: 2.2rem; height: 2.2rem; border-radius: .35rem;
+  object-fit: cover; border: 1px solid var(--border); background: var(--muted);
+}
+.sp-bulk-name {
+  flex: 1; min-width: 0; font-size: .75rem; color: var(--foreground);
+  white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+}
+.sp-bulk-state { font-size: .7rem; font-weight: 700; }
+.sp-bulk-state.pending { color: var(--muted-foreground); }
+.sp-bulk-state.scanning { color: oklch(0.44 0.18 240); }
+.sp-bulk-state.saved { color: oklch(0.45 0.18 145); }
+.sp-bulk-state.failed { color: oklch(0.55 0.22 25); }
+.sp-bulk-msg { margin-top: .7rem; font-size: .74rem; }
+.sp-bulk-msg.ok { color: oklch(0.45 0.18 145); }
+.sp-bulk-msg.err { color: oklch(0.55 0.22 25); }
 
 .sp-form-grid { display: grid; grid-template-columns: 1fr; gap: .85rem; }
 @media (min-width: 640px) { .sp-form-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -309,6 +361,7 @@ const CSS = `
 export default function SportsPage() {
   const pathname = usePathname()
   const fileRef = useRef<HTMLInputElement>(null)
+  const bulkFileRef = useRef<HTMLInputElement>(null)
 
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(true)
@@ -326,6 +379,10 @@ export default function SportsPage() {
   const [scanMsg, setScanMsg] = useState("")
   const [scanMarks, setScanMarks] = useState<number | null>(null)
 
+  const [batchCerts, setBatchCerts] = useState<BatchCert[]>([])
+  const [batchSaving, setBatchSaving] = useState(false)
+  const [batchMsg, setBatchMsg] = useState("")
+
   const [editEntry, setEditEntry] = useState<Achievement | null>(null)
   const [editSaving, setEditSaving] = useState(false)
 
@@ -340,32 +397,257 @@ export default function SportsPage() {
   const totalPoints = achievements.reduce((s, a) => s + a.points, 0)
   const sportsScore = Math.min(totalPoints, 100)
 
+  function setBatchStatus(id: string, status: BatchCert["status"], message: string) {
+    setBatchCerts((prev) => prev.map((c) => (c.id === id ? { ...c, status, message } : c)))
+  }
+
+  function resizeForScan(file: File): Promise<File> {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const objectUrl = URL.createObjectURL(file)
+
+      img.onload = () => {
+        const MAX = 800
+        let { width, height } = img
+        if (width > MAX || height > MAX) {
+          if (width > height) {
+            height = Math.round((height * MAX) / width)
+            width = MAX
+          } else {
+            width = Math.round((width * MAX) / height)
+            height = MAX
+          }
+        }
+
+        const canvas = document.createElement("canvas")
+        canvas.width = width
+        canvas.height = height
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height)
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(objectUrl)
+          if (!blob) {
+            reject(new Error("Failed to resize image"))
+            return
+          }
+          resolve(new File([blob], file.name, { type: "image/jpeg" }))
+        }, "image/jpeg", 0.82)
+      }
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        reject(new Error("Invalid image file"))
+      }
+
+      img.src = objectUrl
+    })
+  }
+
+  function normalizeAchievementType(value: unknown): string {
+    const raw = typeof value === "string" ? value.trim().toUpperCase() : ""
+    if (!raw) return "CERTIFICATE"
+    if (VALID_ACHIEVEMENT_TYPES.has(raw)) return raw
+    if (raw.includes("MEDAL")) return "MEDAL"
+    if (raw.includes("TROPHY") || raw.includes("CUP")) return "TROPHY"
+    return "CERTIFICATE"
+  }
+
+  function normalizeDate(value: unknown): string {
+    const today = new Date().toISOString().split("T")[0]
+    if (typeof value !== "string") return today
+
+    const v = value.trim()
+    if (!v || v.toLowerCase() === "null" || v.toLowerCase() === "n/a") return today
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+
+    const dmy = v.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/)
+    if (dmy) {
+      const dd = dmy[1].padStart(2, "0")
+      const mm = dmy[2].padStart(2, "0")
+      return `${dmy[3]}-${mm}-${dd}`
+    }
+
+    const parsed = new Date(v)
+    return Number.isNaN(parsed.getTime()) ? today : parsed.toISOString().split("T")[0]
+  }
+
+  function normalizePoints(value: unknown, position: string | null): number {
+    const points = Number(value)
+    if ([3, 2, 1, 0.5].includes(points)) return points
+    const pos = (position ?? "").toLowerCase()
+    if (/1st|first|champion|gold|winner/.test(pos)) return 3
+    if (/2nd|second|runner.?up|silver/.test(pos)) return 2
+    if (/3rd|third|bronze/.test(pos)) return 1
+    return 0.5
+  }
+
+  function fallbackSportName(fileName: string): string {
+    const cleaned = fileName
+      .replace(/\.[^.]+$/, "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+    return cleaned || "Sports Achievement"
+  }
+
+  async function fetchJsonWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+      const response = await fetch(url, { ...init, signal: controller.signal })
+      const payload = await response.json().catch(() => ({}))
+      return { response, payload }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
-    // Resize client-side to max 800px so base64 stays under NVIDIA's inline limit
-    const img = new Image()
-    const objectUrl = URL.createObjectURL(f)
-    img.onload = () => {
-      const MAX = 800
-      let { width, height } = img
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round(height * MAX / width); width = MAX }
-        else { width = Math.round(width * MAX / height); height = MAX }
-      }
-      const canvas = document.createElement("canvas")
-      canvas.width = width; canvas.height = height
-      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height)
-      canvas.toBlob((blob) => {
-        if (!blob) return
-        const resized = new File([blob], f.name, { type: "image/jpeg" })
-        URL.revokeObjectURL(objectUrl)
+    resizeForScan(f)
+      .then((resized) => {
         setCertFile(resized)
         setCertPreview(URL.createObjectURL(resized))
-        setCertUrl(null); setScanMsg(""); setScanMarks(null)
-      }, "image/jpeg", 0.82)
+        setCertUrl(null)
+        setScanMsg("")
+        setScanMarks(null)
+      })
+      .catch(() => setFormError("Invalid certificate image."))
+  }
+
+  async function handleBatchFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+
+    setBatchMsg("")
+    for (const file of files) {
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        setBatchMsg(`Unsupported file type: ${file.name}. Use JPG, PNG, or WebP.`)
+        continue
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        setBatchMsg(`${file.name} is larger than 5 MB.`)
+        continue
+      }
+      try {
+        const resized = await resizeForScan(file)
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+        setBatchCerts((prev) => [
+          ...prev,
+          {
+            id,
+            file: resized,
+            preview: URL.createObjectURL(resized),
+            status: "pending",
+            message: "Ready",
+          },
+        ])
+      } catch {
+        setBatchMsg(`Failed to process: ${file.name}`)
+      }
     }
-    img.src = objectUrl
+
+    if (bulkFileRef.current) bulkFileRef.current.value = ""
+  }
+
+  function removeBatchCert(id: string) {
+    setBatchCerts((prev) => {
+      const target = prev.find((c) => c.id === id)
+      if (target) URL.revokeObjectURL(target.preview)
+      return prev.filter((c) => c.id !== id)
+    })
+  }
+
+  function clearBatchCerts() {
+    setBatchCerts((prev) => {
+      prev.forEach((c) => URL.revokeObjectURL(c.preview))
+      return []
+    })
+    setBatchMsg("")
+  }
+
+  async function scanAndAddBatch() {
+    const queue = batchCerts.filter((c) => c.status === "pending" || c.status === "failed")
+    if (!queue.length) {
+      setBatchMsg("No pending certificates to process.")
+      return
+    }
+
+    setBatchSaving(true)
+    setBatchMsg("")
+
+    let savedCount = 0
+    const created: Achievement[] = []
+
+    for (const cert of queue) {
+      setBatchStatus(cert.id, "scanning", "Scanning certificate...")
+
+      const fd = new FormData()
+      fd.append("image", cert.file)
+
+      try {
+        const { response: scanRes, payload: scanData } = await fetchJsonWithTimeout(
+          "/api/profile/sports/scan",
+          { method: "POST", body: fd },
+          CLIENT_SCAN_TIMEOUT_MS,
+        )
+
+        if (!scanRes.ok) {
+          setBatchStatus(cert.id, "failed", scanData.error ?? "Scan failed")
+          continue
+        }
+
+        const position = typeof scanData.position === "string" && scanData.position.trim()
+          ? scanData.position.trim()
+          : null
+        const sportName =
+          (typeof scanData.sportName === "string" && scanData.sportName.trim()) ||
+          (typeof scanData.eventName === "string" && scanData.eventName.trim()) ||
+          fallbackSportName(cert.file.name)
+        const achievementType = normalizeAchievementType(scanData.achievementType)
+        const normalizedDate = normalizeDate(scanData.date)
+        const points = normalizePoints(scanData.points, position)
+
+        const saveRes = await fetch("/api/profile/sports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sportName,
+            achievementType,
+            position,
+            date: normalizedDate,
+            points,
+            certificateUrl: scanData.fileUrl,
+            certificateFileName: cert.file.name,
+          }),
+        })
+
+        const saveData = await saveRes.json()
+        if (!saveRes.ok) {
+          setBatchStatus(cert.id, "failed", saveData.error ?? "Failed to save")
+          continue
+        }
+
+        created.push(saveData as Achievement)
+        savedCount += 1
+        setBatchStatus(cert.id, "saved", "Saved")
+      } catch (error) {
+        const msg = error instanceof Error && error.name === "AbortError"
+          ? "Scan timed out"
+          : "Unexpected error"
+        setBatchStatus(cert.id, "failed", msg)
+      }
+    }
+
+    if (created.length) setAchievements((prev) => [...created, ...prev])
+    const failedCount = queue.length - savedCount
+    setBatchMsg(
+      failedCount === 0
+        ? `Added ${savedCount} achievement${savedCount !== 1 ? "s" : ""} from certificates.`
+        : `Added ${savedCount} achievement${savedCount !== 1 ? "s" : ""}. ${failedCount} failed.`
+    )
+    setBatchSaving(false)
   }
 
   function removeCert() {
@@ -379,8 +661,11 @@ export default function SportsPage() {
     const fd = new FormData()
     fd.append("image", certFile)
     try {
-      const res = await fetch("/api/profile/sports/scan", { method: "POST", body: fd })
-      const data = await res.json()
+      const { response: res, payload: data } = await fetchJsonWithTimeout(
+        "/api/profile/sports/scan",
+        { method: "POST", body: fd },
+        CLIENT_SCAN_TIMEOUT_MS,
+      )
       if (!res.ok) { setScanMsg(data.error ?? "Scan failed."); if (data.fileUrl) setCertUrl(data.fileUrl); return }
       const marks = data.points ?? 0.5
       setForm((prev) => ({
@@ -395,7 +680,13 @@ export default function SportsPage() {
       setCertUrl(data.fileUrl)
       setScanMarks(marks)
       setScanMsg("Certificate scanned — fields auto-filled. Review before saving.")
-    } catch { setScanMsg("Scan error. Please fill in details manually.") }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        setScanMsg("Scan timed out. Please try again with a clearer image.")
+      } else {
+        setScanMsg("Scan error. Please fill in details manually.")
+      }
+    }
     finally { setScanning(false) }
   }
 
@@ -443,7 +734,7 @@ export default function SportsPage() {
       {/* Hero */}
       <div className="sp-hero">
         <h1 className="sp-hero-title">Sports Achievements</h1>
-        <p className="sp-hero-sub">Record trophies, medals, and certificates. Upload a certificate to auto-scan.</p>
+        <p className="sp-hero-sub">Record trophies, medals, and certificates. Upload one or more certificates to auto-scan.</p>
         {!showForm && (
           <button className="sp-hero-add" onClick={() => { setShowForm(true); setFormError("") }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
@@ -488,9 +779,9 @@ export default function SportsPage() {
           <div className="sp-section">
             <div className="sp-section-head">
               <span className="sp-step">1</span>
-              <h3 className="sp-section-title">Upload Certificate (optional)</h3>
+              <h3 className="sp-section-title">Upload Certificate(s) (optional)</h3>
             </div>
-            <p className="sp-section-desc">Upload a photo of your certificate. AI will scan it and auto-assign marks based on your placement.</p>
+            <p className="sp-section-desc">Upload one or more certificate photos. AI can auto-fill details and marks from each certificate.</p>
             <div className="sp-marks-legend">
               {MARKS_LEGEND.map((m) => (
                 <span key={m.label} className="sp-marks-pill" style={{ background: m.bg, color: m.color, borderColor: m.color + "44" }}>
@@ -498,6 +789,51 @@ export default function SportsPage() {
                 </span>
               ))}
             </div>
+
+            <div className="sp-bulk-box">
+              <p className="sp-bulk-title">Bulk Add Certificates</p>
+              <p className="sp-bulk-sub">Select one or more certificates to auto-fill details and add all as achievements.</p>
+              <div className="sp-bulk-actions">
+                <label className="sp-bulk-pick">
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  Select Certificates
+                  <input ref={bulkFileRef} type="file" multiple accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={handleBatchFileChange} />
+                </label>
+                <button type="button" className="sp-btn-primary" disabled={batchSaving || batchCerts.length === 0} onClick={scanAndAddBatch}>
+                  {batchSaving ? "Auto Filling..." : "Auto Fill & Add All"}
+                </button>
+                {batchCerts.length > 0 && (
+                  <button type="button" className="sp-btn-ghost" onClick={clearBatchCerts} disabled={batchSaving}>Clear</button>
+                )}
+              </div>
+
+              {batchCerts.length > 0 && (
+                <div className="sp-bulk-list">
+                  {batchCerts.map((cert) => (
+                    <div key={cert.id} className="sp-bulk-item">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cert.preview} alt="Certificate preview" className="sp-bulk-thumb" />
+                      <span className="sp-bulk-name" title={cert.file.name}>{cert.file.name}</span>
+                      <span className={`sp-bulk-state ${cert.status}`}>{cert.message}</span>
+                      {cert.status !== "scanning" && cert.status !== "saved" && (
+                        <button type="button" className="sp-icon-btn del" onClick={() => removeBatchCert(cert.id)}>
+                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {batchMsg && (
+                <p className={`sp-bulk-msg ${batchMsg.includes("failed") ? "err" : "ok"}`}>{batchMsg}</p>
+              )}
+            </div>
+
             {!certPreview ? (
               <label className="sp-dropzone">
                 <svg className="sp-dropzone-icon" width="40" height="40" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
