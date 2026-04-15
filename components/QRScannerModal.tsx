@@ -3,7 +3,17 @@
 import { useEffect, useRef, useState } from "react"
 import jsQR from "jsqr"
 
-type ScanResult = { success: boolean; clubName?: string; label?: string; error?: string }
+type ScanResult = {
+  success: boolean
+  clubName?: string
+  clubId?: number
+  label?: string
+  scannedAt?: string
+  attendanceId?: number
+  studentName?: string
+  studentId?: string
+  error?: string
+}
 
 interface Props {
   onClose: () => void
@@ -195,7 +205,16 @@ export default function QRScannerModal({ onClose, onSuccess }: Props) {
       if (!res.ok) {
         setScanResult({ success: false, error: data.error ?? "Failed to mark attendance." })
       } else {
-        const result: ScanResult = { success: true, clubName: data.clubName, label: data.label }
+        const result: ScanResult = {
+          success: true,
+          clubName: data.clubName,
+          clubId: data.clubId,
+          label: data.label,
+          scannedAt: data.scannedAt,
+          attendanceId: data.attendanceId,
+          studentName: data.studentName,
+          studentId: data.studentId,
+        }
         setScanResult(result)
         onSuccess(result)
       }
@@ -265,6 +284,9 @@ export default function QRScannerModal({ onClose, onSuccess }: Props) {
                   <div className="qrs-success">
                     <div className="qrs-success-title">✓ Attendance Marked!</div>
                     <div className="qrs-success-sub">{scanResult.clubName} — {scanResult.label}</div>
+                    {scanResult.scannedAt && (
+                      <div className="qrs-success-sub">{new Date(scanResult.scannedAt).toLocaleString()}</div>
+                    )}
                   </div>
                 ) : (
                   <div className="qrs-error">

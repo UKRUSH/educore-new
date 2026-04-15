@@ -35,10 +35,19 @@ export async function POST(request: NextRequest) {
     data: { userId: session.userId, sessionId: attendanceSession.id },
   })
 
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { fullName: true, studentId: true },
+  })
+
   return Response.json({
     success: true,
+    attendanceId: attendance.id,
+    clubId: attendanceSession.clubId,
     clubName: attendanceSession.club.name,
     label: attendanceSession.label,
     scannedAt: attendance.scannedAt,
+    studentName: user?.fullName ?? "",
+    studentId: user?.studentId ?? "",
   })
 }

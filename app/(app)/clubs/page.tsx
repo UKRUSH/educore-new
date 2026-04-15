@@ -33,6 +33,26 @@ type MyClub = {
 }
 type AttendanceQR = { token: string; label: string; expiresAt: string; qrDataUrl: string; clubId: number }
 type StudentProfile = { fullName: string; studentId: string }
+type ScanResult = {
+  success: boolean
+  clubName?: string
+  clubId?: number
+  label?: string
+  scannedAt?: string
+  attendanceId?: number
+  studentName?: string
+  studentId?: string
+  error?: string
+}
+type AttendanceRecord = {
+  attendanceId: number
+  clubName: string
+  label: string
+  scannedAt: string
+  studentName: string
+  studentId: string
+  status: "COMPLETED"
+}
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -533,6 +553,21 @@ const CSS = `
 }
 .cb-gen-btn:hover { opacity: .9; }
 .cb-gen-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Attendance confirmation */
+.cb-att-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media (max-width: 640px) { .cb-att-form-grid { grid-template-columns: 1fr; } }
+.cb-att-readonly {
+  width: 100%; border: 1.5px solid var(--border); border-radius: .65rem;
+  padding: .62rem .85rem; font-size: .86rem; color: var(--foreground);
+  background: var(--muted); min-height: 2.45rem; display: flex; align-items: center;
+}
+.cb-att-status {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .3rem .75rem; border-radius: 999px;
+  background: oklch(0.93 0.06 145 / 0.35); color: oklch(0.38 0.18 145);
+  border: 1px solid oklch(0.82 0.1 145 / 0.5); font-size: .76rem; font-weight: 800;
+}
 `
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -568,6 +603,7 @@ export default function ClubsPage() {
   const [myClubsLoading, setMyClubsLoading] = useState(true)
   const [showScanner, setShowScanner]   = useState(false)
   const [scanSuccess, setScanSuccess]   = useState<{ clubName: string; label: string } | null>(null)
+  const [attendanceRecord, setAttendanceRecord] = useState<AttendanceRecord | null>(null)
   const [showQRFor, setShowQRFor]       = useState<MyClub | null>(null)
   const [qrData, setQrData]             = useState<AttendanceQR | null>(null)
   const [qrLabel, setQrLabel]           = useState("Club Meeting")
@@ -1413,10 +1449,85 @@ export default function ClubsPage() {
             setShowScanner(false)
             if (result.success && result.clubName && result.label) {
               setScanSuccess({ clubName: result.clubName, label: result.label })
+              if (result.attendanceId && result.scannedAt) {
+                setAttendanceRecord({
+                  attendanceId: result.attendanceId,
+                  clubName: result.clubName,
+                  label: result.label,
+                  scannedAt: result.scannedAt,
+                  studentName: result.studentName || studentProfile.fullName || "-",
+                  studentId: result.studentId || studentProfile.studentId || "-",
+                  status: "COMPLETED",
+                })
+              }
               load() // refresh attendance counts
             }
           }}
         />
+      )}
+
+      {/* ── Attendance Record Modal ── */}
+      {attendanceRecord && (
+        <div className="cb-backdrop" onClick={() => setAttendanceRecord(null)}>
+          <div className="cb-modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+            <div className="cb-modal-top" style={{ background: "linear-gradient(135deg, oklch(0.55 0.2 145), oklch(0.45 0.2 150))" }} />
+
+            <div className="cb-modal-header">
+              <div style={{ display: "flex", alignItems: "flex-start", gap: ".85rem", flex: 1, minWidth: 0 }}>
+                <div className="cb-modal-logo" style={{ background: "linear-gradient(135deg, oklch(0.55 0.2 145), oklch(0.45 0.2 150))" }}>✅</div>
+                <div style={{ minWidth: 0 }}>
+                  <div className="cb-modal-name">Attendance Completed</div>
+                  <div style={{ fontSize: ".78rem", color: "var(--muted-foreground)", marginTop: ".2rem" }}>
+                    Your attendance was successfully recorded.
+                  </div>
+                </div>
+              </div>
+              <button className="cb-modal-close" onClick={() => setAttendanceRecord(null)}>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="cb-modal-body">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: ".6rem", flexWrap: "wrap" }}>
+                <span className="cb-att-status">✓ COMPLETED</span>
+                <span style={{ fontSize: ".75rem", color: "var(--muted-foreground)" }}>
+                  Ref #{attendanceRecord.attendanceId}
+                </span>
+              </div>
+
+              <div className="cb-att-form-grid">
+                <div className="cb-field">
+                  <label className="cb-lbl">Student ID</label>
+                  <div className="cb-att-readonly">{attendanceRecord.studentId}</div>
+                </div>
+                <div className="cb-field">
+                  <label className="cb-lbl">Student Name</label>
+                  <div className="cb-att-readonly">{attendanceRecord.studentName}</div>
+                </div>
+                <div className="cb-field">
+                  <label className="cb-lbl">Club</label>
+                  <div className="cb-att-readonly">{attendanceRecord.clubName}</div>
+                </div>
+                <div className="cb-field">
+                  <label className="cb-lbl">Session</label>
+                  <div className="cb-att-readonly">{attendanceRecord.label}</div>
+                </div>
+                <div className="cb-field" style={{ gridColumn: "1 / -1" }}>
+                  <label className="cb-lbl">Scanned Time</label>
+                  <div className="cb-att-readonly">{new Date(attendanceRecord.scannedAt).toLocaleString()}</div>
+                </div>
+              </div>
+
+              <div className="cb-form-actions">
+                <button className="cb-submit-btn" onClick={() => setAttendanceRecord(null)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Create QR Modal ── */}
